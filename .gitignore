@@ -1,0 +1,44 @@
+# Archivos de logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencias
+node_modules/
+
+# Archivos de entorno
+.env
+.env.test
+.env.production
+.env.local
+
+# Builds y compilados
+dist/
+build/
+
+# Archivos de testing / coverage
+coverage/
+.nyc_output
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+
+.claude
+data/
+
+# Configuración de editores / IDEs
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.sln
+
+# Caché variada
+.npm
+.eslintcache

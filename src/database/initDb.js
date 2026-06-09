@@ -1,0 +1,60 @@
+import { getDb } from "./db.js";
+
+async function initDb() {
+    const db = await getDb();
+
+    await db.exec(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      passwordHash TEXT NOT NULL,
+      rol TEXT NOT NULL CHECK (rol IN ('usuario', 'admin')),
+      activo INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS menus (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      descripcion TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      tipo TEXT NOT NULL CHECK (tipo IN ('clasico', 'vegetariano', 'vegano', 'sin_tacc')),
+      precio REAL NOT NULL,
+      cupoDiario INTEGER NOT NULL,
+      activo INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS pedidos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      menuId INTEGER NOT NULL,
+      usuarioId INTEGER NOT NULL,
+      fecha TEXT NOT NULL,
+      cantidad INTEGER NOT NULL,
+      turnoEntrega TEXT NOT NULL CHECK (turnoEntrega IN ('almuerzo', 'cena')),
+      puntoRetiro TEXT NOT NULL,
+      total REAL NOT NULL,
+      estado TEXT NOT NULL CHECK (estado IN ('pendiente', 'confirmado', 'cancelado', 'entregado')),
+      observaciones TEXT,
+      FOREIGN KEY (menuId) REFERENCES menus(id),
+      FOREIGN KEY (usuarioId) REFERENCES usuarios(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS historial_pedidos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedidoId INTEGER NOT NULL,
+      usuarioId INTEGER NOT NULL,
+      accion TEXT NOT NULL,
+      fechaHora TEXT NOT NULL,
+      valorAnterior TEXT,
+      valorNuevo TEXT,
+      FOREIGN KEY (pedidoId) REFERENCES pedidos(id),
+      FOREIGN KEY (usuarioId) REFERENCES usuarios(id)
+    );
+  `);
+
+    console.log("Base de datos inicializada correctamente.");
+}
+
+initDb().catch((error) => {
+    console.error("Error inicializando la base:", error);
+});
