@@ -1,7 +1,20 @@
-import { getDb } from "../database/db.js";
+import { getDb, withTransaction } from "../database/db.js";
 import { AppError } from "../utils/AppErrors.js";
 
 // ── Helpers internos ─────────────────────────────────────────────────────────
+
+async function fetchPedidoById(db, id) {
+    const pedido = await db.get(
+        `SELECT p.*, m.nombre AS menuNombre, u.nombre AS usuarioNombre
+         FROM pedidos p
+         JOIN menus m ON m.id = p.menuId
+         JOIN usuarios u ON u.id = p.usuarioId
+         WHERE p.id = ?`,
+        [id]
+    );
+    if (!pedido) throw AppError("Pedido no encontrado", 404);
+    return pedido;
+}
 
 async function registrarHistorial(db, { pedidoId, usuarioId, accion, valorAnterior = null, valorNuevo = null }) {
     await db.run(
@@ -81,19 +94,8 @@ export async function listarPedidos({ usuarioId, rol, estado, fecha, page = 1, l
 
 export async function obtenerPedido(id, usuarioId, rol) {
     const db = await getDb();
-
-    const pedido = await db.get(
-        `SELECT p.*, m.nombre AS menuNombre, u.nombre AS usuarioNombre
-         FROM pedidos p
-         JOIN menus m ON m.id = p.menuId
-         JOIN usuarios u ON u.id = p.usuarioId
-         WHERE p.id = ?`,
-        [id]
-    );
-
-    if (!pedido) throw AppError("Pedido no encontrado", 404);
+    const pedido = await fetchPedidoById(db, id);
     if (rol === "usuario" && pedido.usuarioId !== usuarioId) throw AppError("No tenés acceso a este pedido", 403);
-
     return pedido;
 }
 
@@ -102,32 +104,35 @@ export async function obtenerPedido(id, usuarioId, rol) {
 export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, observaciones }) {
     if (cantidad <= 0) throw AppError("La cantidad debe ser mayor a 0", 400);
 
+    // Validaciones de menú fuera de la transacción (solo lectura)
     const db = await getDb();
-
     const menu = await db.get("SELECT * FROM menus WHERE id = ?", [menuId]);
     if (!menu)        throw AppError("Menú no encontrado", 404);
     if (!menu.activo) throw AppError("El menú no está activo", 400);
     if (menu.fecha !== fecha) throw AppError("El menú no está disponible para esa fecha", 400);
 
-    const cupoDisponible = await calcularCupoDisponible(db, menuId, fecha);
-    if (cantidad > cupoDisponible) throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
+    return withTransaction(async (db) => {
+        // Cupo dentro de la transacción: BEGIN IMMEDIATE bloquea otros writers
+        const cupoDisponible = await calcularCupoDisponible(db, menuId, fecha);
+        if (cantidad > cupoDisponible) throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
 
-    const total = menu.precio * cantidad;
+        const total = menu.precio * cantidad;
 
-    const { lastID } = await db.run(
-        `INSERT INTO pedidos (menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, estado, observaciones)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente', ?)`,
-        [menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, observaciones ?? null]
-    );
+        const { lastID } = await db.run(
+            `INSERT INTO pedidos (menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, estado, observaciones)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente', ?)`,
+            [menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, observaciones ?? null]
+        );
 
-    await registrarHistorial(db, {
-        pedidoId: lastID,
-        usuarioId,
-        accion:    "creacion",
-        valorNuevo: { estado: "pendiente", cantidad, total },
+        await registrarHistorial(db, {
+            pedidoId: lastID,
+            usuarioId,
+            accion:    "creacion",
+            valorNuevo: { estado: "pendiente", cantidad, total },
+        });
+
+        return fetchPedidoById(db, lastID);
     });
-
-    return obtenerPedido(lastID, usuarioId, "admin");
 }
 
 // ── Editar ────────────────────────────────────────────────────────────────────
@@ -145,48 +150,49 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
     const nuevaCantidad = cantidad ?? pedido.cantidad;
     if (nuevaCantidad <= 0) throw AppError("La cantidad debe ser mayor a 0", 400);
 
-    // Revalidar cupo solo si cambia la cantidad, excluyendo el pedido actual del conteo
-    if (cantidad !== undefined && cantidad !== pedido.cantidad) {
-        const cupoDisponible = await calcularCupoDisponible(db, pedido.menuId, pedido.fecha, id);
-        if (nuevaCantidad > cupoDisponible) throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
-    }
-
     const menu = await db.get("SELECT precio FROM menus WHERE id = ?", [pedido.menuId]);
-    const nuevoTotal = menu.precio * nuevaCantidad;
 
-    const valorAnterior = {
-        cantidad:     pedido.cantidad,
-        turnoEntrega: pedido.turnoEntrega,
-        puntoRetiro:  pedido.puntoRetiro,
-        total:        pedido.total,
-    };
+    return withTransaction(async (db) => {
+        if (cantidad !== undefined && cantidad !== pedido.cantidad) {
+            const cupoDisponible = await calcularCupoDisponible(db, pedido.menuId, pedido.fecha, id);
+            if (nuevaCantidad > cupoDisponible) throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
+        }
 
-    await db.run(
-        `UPDATE pedidos SET cantidad = ?, turnoEntrega = ?, puntoRetiro = ?, total = ?, observaciones = ? WHERE id = ?`,
-        [
-            nuevaCantidad,
-            turnoEntrega  ?? pedido.turnoEntrega,
-            puntoRetiro   ?? pedido.puntoRetiro,
-            nuevoTotal,
-            observaciones ?? pedido.observaciones,
-            id,
-        ]
-    );
+        const nuevoTotal = menu.precio * nuevaCantidad;
+        const valorAnterior = {
+            cantidad:     pedido.cantidad,
+            turnoEntrega: pedido.turnoEntrega,
+            puntoRetiro:  pedido.puntoRetiro,
+            total:        pedido.total,
+        };
 
-    await registrarHistorial(db, {
-        pedidoId: id,
-        usuarioId,
-        accion: "edicion",
-        valorAnterior,
-        valorNuevo: {
-            cantidad:     nuevaCantidad,
-            turnoEntrega: turnoEntrega  ?? pedido.turnoEntrega,
-            puntoRetiro:  puntoRetiro   ?? pedido.puntoRetiro,
-            total:        nuevoTotal,
-        },
+        await db.run(
+            `UPDATE pedidos SET cantidad = ?, turnoEntrega = ?, puntoRetiro = ?, total = ?, observaciones = ? WHERE id = ?`,
+            [
+                nuevaCantidad,
+                turnoEntrega  ?? pedido.turnoEntrega,
+                puntoRetiro   ?? pedido.puntoRetiro,
+                nuevoTotal,
+                observaciones ?? pedido.observaciones,
+                id,
+            ]
+        );
+
+        await registrarHistorial(db, {
+            pedidoId: id,
+            usuarioId,
+            accion: "edicion",
+            valorAnterior,
+            valorNuevo: {
+                cantidad:     nuevaCantidad,
+                turnoEntrega: turnoEntrega  ?? pedido.turnoEntrega,
+                puntoRetiro:  puntoRetiro   ?? pedido.puntoRetiro,
+                total:        nuevoTotal,
+            },
+        });
+
+        return fetchPedidoById(db, id);
     });
-
-    return obtenerPedido(id, usuarioId, rol);
 }
 
 // ── Cambio de estado ──────────────────────────────────────────────────────────
@@ -215,17 +221,20 @@ export async function cambiarEstado(id, nuevoEstado, usuarioId, rol) {
     }
 
     const estadoAnterior = pedido.estado;
-    await db.run("UPDATE pedidos SET estado = ? WHERE id = ?", [nuevoEstado, id]);
 
-    await registrarHistorial(db, {
-        pedidoId: id,
-        usuarioId,
-        accion:        `estado:${estadoAnterior}->${nuevoEstado}`,
-        valorAnterior: { estado: estadoAnterior },
-        valorNuevo:    { estado: nuevoEstado },
+    return withTransaction(async (db) => {
+        await db.run("UPDATE pedidos SET estado = ? WHERE id = ?", [nuevoEstado, id]);
+
+        await registrarHistorial(db, {
+            pedidoId: id,
+            usuarioId,
+            accion:        `estado:${estadoAnterior}->${nuevoEstado}`,
+            valorAnterior: { estado: estadoAnterior },
+            valorNuevo:    { estado: nuevoEstado },
+        });
+
+        return fetchPedidoById(db, id);
     });
-
-    return obtenerPedido(id, usuarioId, rol);
 }
 
 // ── Resumen admin ─────────────────────────────────────────────────────────────

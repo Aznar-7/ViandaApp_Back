@@ -1,19 +1,23 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import { errorHandler } from "./middlewares/errorHandler.js";
+import { CORS_ORIGIN } from "./config/env.js";
 import authRoutes    from "./routes/auth.routes.js";
 import menusRoutes   from "./routes/menus.routes.js";
 import pedidosRoutes from "./routes/pedidos.routes.js";
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+app.use(helmet());
+app.use(cors({ origin: CORS_ORIGIN }));
+app.use(express.json({ limit: "10kb" }));
 
 app.use("/api/auth",    authRoutes);
 app.use("/api/menus",   menusRoutes);
 app.use("/api/pedidos", pedidosRoutes);
 
+app.use((req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);
 
 export default app;

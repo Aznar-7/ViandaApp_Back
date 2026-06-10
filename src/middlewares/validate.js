@@ -23,6 +23,22 @@ export function validate(schema) {
             if (reglas.min !== undefined && valor < reglas.min) {
                 errores.push(`"${campo}" debe ser mayor o igual a ${reglas.min}`);
             }
+
+            if (reglas.minLength !== undefined && valor.length < reglas.minLength) {
+                errores.push(`"${campo}" debe tener al menos ${reglas.minLength} caracteres`);
+            }
+
+            if (reglas.maxLength !== undefined && valor.length > reglas.maxLength) {
+                errores.push(`"${campo}" no puede superar los ${reglas.maxLength} caracteres`);
+            }
+
+            if (reglas.enum && !reglas.enum.includes(valor)) {
+                errores.push(`"${campo}" debe ser uno de: ${reglas.enum.join(", ")}`);
+            }
+
+            if (reglas.pattern && !reglas.pattern.test(valor)) {
+                errores.push(`"${campo}" tiene un formato inválido`);
+            }
         }
 
         if (errores.length > 0) {

@@ -26,3 +26,16 @@ export async function closeDb() {
         db = null;
     }
 }
+
+export async function withTransaction(fn) {
+    const db = await getDb();
+    await db.run("BEGIN IMMEDIATE");
+    try {
+        const result = await fn(db);
+        await db.run("COMMIT");
+        return result;
+    } catch (err) {
+        await db.run("ROLLBACK").catch(() => {});
+        throw err;
+    }
+}
