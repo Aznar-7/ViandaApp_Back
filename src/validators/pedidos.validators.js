@@ -1,17 +1,17 @@
-const fechaPattern = /^\d{4}-\d{2}-\d{2}$/;
+import { TURNOS_ENTREGA } from "../domain/constants.js";
 
 export const crearPedidoSchema = {
-    menuId:        { required: true,  type: "number" },
-    fecha:         { required: true,  type: "string", pattern: fechaPattern },
-    cantidad:      { required: true,  type: "number", min: 1 },
-    turnoEntrega:  { required: true,  type: "string", enum: ["almuerzo", "cena"] },
+    menuId:        { required: true,  type: "number", integer: true, min: 1 },
+    fecha:         { required: true,  type: "string", date: true },
+    cantidad:      { required: true,  type: "number", integer: true, min: 1 },
+    turnoEntrega:  { required: true,  type: "string", enum: TURNOS_ENTREGA },
     puntoRetiro:   { required: true,  type: "string", minLength: 2, maxLength: 200 },
     observaciones: { required: false, type: "string", maxLength: 500 },
 };
 
 export const editarPedidoSchema = {
-    cantidad:      { required: false, type: "number", min: 1 },
-    turnoEntrega:  { required: false, type: "string", enum: ["almuerzo", "cena"] },
+    cantidad:      { required: false, type: "number", integer: true, min: 1 },
+    turnoEntrega:  { required: false, type: "string", enum: TURNOS_ENTREGA },
     puntoRetiro:   { required: false, type: "string", minLength: 2, maxLength: 200 },
     observaciones: { required: false, type: "string", maxLength: 500 },
 };

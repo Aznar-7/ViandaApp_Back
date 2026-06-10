@@ -1,8 +1,9 @@
 import jwt from "jsonwebtoken";
-import { JWT_SECRET } from "../config/env.js";
+import { JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET } from "../config/env.js";
+import { getDb } from "../database/db.js";
 import { AppError } from "../utils/AppErrors.js";
 
-export function authenticate(req, res, next) {
+export async function authenticate(req, res, next) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -11,10 +12,30 @@ export function authenticate(req, res, next) {
 
     const token = authHeader.split(" ")[1];
 
+    let payload;
     try {
-        req.user = jwt.verify(token, JWT_SECRET);
-        next();
+        payload = jwt.verify(token, JWT_SECRET, {
+            issuer: JWT_ISSUER,
+            audience: JWT_AUDIENCE,
+        });
     } catch {
-        next(AppError("Token inválido o expirado", 401));
+        return next(AppError("Token invalido o expirado", 401));
+    }
+
+    try {
+        const db = await getDb();
+        const user = await db.get(
+            "SELECT id, email, rol, activo FROM usuarios WHERE id = ?",
+            [payload.id]
+        );
+
+        if (!user || !user.activo) {
+            return next(AppError("Usuario inactivo o inexistente", 403));
+        }
+
+        req.user = { id: user.id, email: user.email, rol: user.rol };
+        next();
+    } catch (error) {
+        next(error);
     }
 }

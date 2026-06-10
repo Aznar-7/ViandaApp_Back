@@ -33,7 +33,26 @@ npm run dev       # 🚀 http://localhost:3000
 PORT=3000
 JWT_SECRET=tu_clave_secreta
 DB_FILE=./data/database.sqlite
+CORS_ORIGIN=http://localhost:5173
+BUSINESS_TIME_ZONE=America/Argentina/Buenos_Aires
 ```
+
+`CORS_ORIGIN` define los frontends autorizados. En produccion es obligatorio y
+debe contener la URL publica exacta del frontend, sin rutas:
+
+```env
+NODE_ENV=production
+CORS_ORIGIN=https://viandas.example.com
+```
+
+Para autorizar mas de un frontend, separar las URLs por coma:
+
+```env
+CORS_ORIGIN=https://viandas.example.com,https://admin.viandas.example.com
+```
+
+No usar `*`: la API acepta solamente los origins declarados. Requests internos
+sin header `Origin` siguen permitidos.
 
 ---
 
@@ -163,10 +182,10 @@ Authorization: Bearer <token>
 ## 📐 Cálculo de cupos
 
 ```
-cupoDisponible = cupoDiario − Σ( cantidades en estado pendiente o confirmado )
+cupoDisponible = cupoDiario − Σ( cantidades en estado pendiente, confirmado o entregado )
 ```
 
-- `cancelado` y `entregado` **no consumen cupo**
+- Solo `cancelado` **no consume cupo**
 - Al **crear**: se valida contra el cupo disponible
 - Al **editar**: el pedido actual se excluye del conteo para no contarse dos veces
 - `total` siempre lo calcula el backend → `precio × cantidad`

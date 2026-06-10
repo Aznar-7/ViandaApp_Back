@@ -1,7 +1,7 @@
 import { getDb, withTransaction } from "../database/db.js";
+import { ORDENES_PEDIDO } from "../domain/constants.js";
 import { AppError } from "../utils/AppErrors.js";
-
-// ── Helpers internos ─────────────────────────────────────────────────────────
+import { getBusinessDate } from "../utils/date.js";
 
 async function fetchPedidoById(db, id) {
     const pedido = await db.get(
@@ -26,17 +26,15 @@ async function registrarHistorial(db, { pedidoId, usuarioId, accion, valorAnteri
             accion,
             new Date().toISOString(),
             valorAnterior ? JSON.stringify(valorAnterior) : null,
-            valorNuevo    ? JSON.stringify(valorNuevo)    : null,
+            valorNuevo ? JSON.stringify(valorNuevo) : null,
         ]
     );
 }
 
-// excluirPedidoId = -1 significa "no excluir ninguno" (para creación)
-// Para edición se pasa el ID del pedido actual para no contarlo dos veces
 async function calcularCupoDisponible(db, menuId, fecha, excluirPedidoId = -1) {
     const row = await db.get(
         `SELECT m.cupoDiario - COALESCE(SUM(
-             CASE WHEN p.estado IN ('pendiente', 'confirmado') THEN p.cantidad ELSE 0 END
+             CASE WHEN p.estado IN ('pendiente', 'confirmado', 'entregado') THEN p.cantidad ELSE 0 END
          ), 0) AS cupoDisponible
          FROM menus m
          LEFT JOIN pedidos p ON p.menuId = m.id AND p.fecha = ? AND p.id != ?
@@ -47,15 +45,11 @@ async function calcularCupoDisponible(db, menuId, fecha, excluirPedidoId = -1) {
     return row?.cupoDisponible ?? 0;
 }
 
-// ── Listado ───────────────────────────────────────────────────────────────────
-
 export async function listarPedidos({ usuarioId, rol, estado, fecha, page = 1, limit = 10, order = "fecha" }) {
     const db = await getDb();
-
     const condiciones = [];
     const params = [];
 
-    // usuario solo ve los suyos; admin ve todos
     if (rol === "usuario") {
         condiciones.push("p.usuarioId = ?");
         params.push(usuarioId);
@@ -69,9 +63,9 @@ export async function listarPedidos({ usuarioId, rol, estado, fecha, page = 1, l
         params.push(fecha);
     }
 
-    const where  = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
-    const col    = ["fecha", "estado", "total"].includes(order) ? order : "fecha";
-    const offset = (Number(page) - 1) * Number(limit);
+    const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
+    const col = ORDENES_PEDIDO.includes(order) ? order : "fecha";
+    const offset = (page - 1) * limit;
 
     const [pedidos, conteo] = await Promise.all([
         db.all(
@@ -82,42 +76,36 @@ export async function listarPedidos({ usuarioId, rol, estado, fecha, page = 1, l
              ${where}
              ORDER BY p.${col} DESC
              LIMIT ? OFFSET ?`,
-            [...params, Number(limit), offset]
+            [...params, limit, offset]
         ),
         db.get(`SELECT COUNT(*) AS total FROM pedidos p ${where}`, params),
     ]);
 
-    return { pedidos, total: conteo.total, page: Number(page), limit: Number(limit) };
+    return { pedidos, total: conteo.total, page, limit };
 }
-
-// ── Detalle ───────────────────────────────────────────────────────────────────
 
 export async function obtenerPedido(id, usuarioId, rol) {
     const db = await getDb();
     const pedido = await fetchPedidoById(db, id);
-    if (rol === "usuario" && pedido.usuarioId !== usuarioId) throw AppError("No tenés acceso a este pedido", 403);
+    if (rol === "usuario" && pedido.usuarioId !== usuarioId) {
+        throw AppError("No tenes acceso a este pedido", 403);
+    }
     return pedido;
 }
 
-// ── Crear ─────────────────────────────────────────────────────────────────────
-
 export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, observaciones }) {
-    if (cantidad <= 0) throw AppError("La cantidad debe ser mayor a 0", 400);
-
-    // Validaciones de menú fuera de la transacción (solo lectura)
-    const db = await getDb();
-    const menu = await db.get("SELECT * FROM menus WHERE id = ?", [menuId]);
-    if (!menu)        throw AppError("Menú no encontrado", 404);
-    if (!menu.activo) throw AppError("El menú no está activo", 400);
-    if (menu.fecha !== fecha) throw AppError("El menú no está disponible para esa fecha", 400);
-
     return withTransaction(async (txDb) => {
-        // Cupo dentro de la transacción: BEGIN IMMEDIATE bloquea otros writers
+        const menu = await txDb.get("SELECT * FROM menus WHERE id = ?", [menuId]);
+        if (!menu) throw AppError("Menu no encontrado", 404);
+        if (!menu.activo) throw AppError("El menu no esta activo", 400);
+        if (menu.fecha !== fecha) throw AppError("El menu no esta disponible para esa fecha", 400);
+
         const cupoDisponible = await calcularCupoDisponible(txDb, menuId, fecha);
-        if (cantidad > cupoDisponible) throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
+        if (cantidad > cupoDisponible) {
+            throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
+        }
 
         const total = menu.precio * cantidad;
-
         const { lastID } = await txDb.run(
             `INSERT INTO pedidos (menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, estado, observaciones)
              VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente', ?)`,
@@ -127,7 +115,7 @@ export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEnt
         await registrarHistorial(txDb, {
             pedidoId: lastID,
             usuarioId,
-            accion:    "creacion",
+            accion: "creacion",
             valorNuevo: { estado: "pendiente", cantidad, total },
         });
 
@@ -135,52 +123,56 @@ export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEnt
     });
 }
 
-// ── Editar ────────────────────────────────────────────────────────────────────
-
 export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega, puntoRetiro, observaciones }) {
-    if ([cantidad, turnoEntrega, puntoRetiro, observaciones].every(v => v === undefined)) {
-        throw AppError("Debés enviar al menos un campo para editar", 400);
+    if ([cantidad, turnoEntrega, puntoRetiro, observaciones].every(value => value === undefined)) {
+        throw AppError("Debes enviar al menos un campo para editar", 400);
     }
-
-    const db = await getDb();
-
-    const pedido = await db.get("SELECT * FROM pedidos WHERE id = ?", [id]);
-    if (!pedido) throw AppError("Pedido no encontrado", 404);
-    if (rol === "usuario" && pedido.usuarioId !== usuarioId) throw AppError("No tenés acceso a este pedido", 403);
-    if (!["pendiente", "confirmado"].includes(pedido.estado)) {
-        throw AppError("Solo se pueden editar pedidos pendientes o confirmados", 400);
-    }
-
-    const nuevaCantidad = cantidad ?? pedido.cantidad;
-    if (nuevaCantidad <= 0) throw AppError("La cantidad debe ser mayor a 0", 400);
-
-    const menu = await db.get("SELECT precio FROM menus WHERE id = ?", [pedido.menuId]);
 
     return withTransaction(async (txDb) => {
-        if (cantidad !== undefined && cantidad !== pedido.cantidad) {
-            const cupoDisponible = await calcularCupoDisponible(txDb, pedido.menuId, pedido.fecha, id);
-            if (nuevaCantidad > cupoDisponible) throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
+        const pedido = await txDb.get("SELECT * FROM pedidos WHERE id = ?", [id]);
+        if (!pedido) throw AppError("Pedido no encontrado", 404);
+        if (rol === "usuario" && pedido.usuarioId !== usuarioId) {
+            throw AppError("No tenes acceso a este pedido", 403);
+        }
+        if (!["pendiente", "confirmado"].includes(pedido.estado)) {
+            throw AppError("Solo se pueden editar pedidos pendientes o confirmados", 400);
         }
 
+        const nuevaCantidad = cantidad ?? pedido.cantidad;
+        if (cantidad !== undefined && cantidad !== pedido.cantidad) {
+            const cupoDisponible = await calcularCupoDisponible(txDb, pedido.menuId, pedido.fecha, id);
+            if (nuevaCantidad > cupoDisponible) {
+                throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
+            }
+        }
+
+        const menu = await txDb.get("SELECT precio FROM menus WHERE id = ?", [pedido.menuId]);
         const nuevoTotal = menu.precio * nuevaCantidad;
         const valorAnterior = {
-            cantidad:     pedido.cantidad,
+            cantidad: pedido.cantidad,
             turnoEntrega: pedido.turnoEntrega,
-            puntoRetiro:  pedido.puntoRetiro,
-            total:        pedido.total,
+            puntoRetiro: pedido.puntoRetiro,
+            total: pedido.total,
+            observaciones: pedido.observaciones,
         };
 
-        await txDb.run(
-            `UPDATE pedidos SET cantidad = ?, turnoEntrega = ?, puntoRetiro = ?, total = ?, observaciones = ? WHERE id = ?`,
+        const result = await txDb.run(
+            `UPDATE pedidos
+             SET cantidad = ?, turnoEntrega = ?, puntoRetiro = ?, total = ?, observaciones = ?
+             WHERE id = ? AND estado = ?`,
             [
                 nuevaCantidad,
-                turnoEntrega  ?? pedido.turnoEntrega,
-                puntoRetiro   ?? pedido.puntoRetiro,
+                turnoEntrega ?? pedido.turnoEntrega,
+                puntoRetiro ?? pedido.puntoRetiro,
                 nuevoTotal,
                 observaciones ?? pedido.observaciones,
                 id,
+                pedido.estado,
             ]
         );
+        if (result.changes !== 1) {
+            throw AppError("El pedido cambio mientras se procesaba la solicitud", 409);
+        }
 
         await registrarHistorial(txDb, {
             pedidoId: id,
@@ -188,10 +180,11 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
             accion: "edicion",
             valorAnterior,
             valorNuevo: {
-                cantidad:     nuevaCantidad,
-                turnoEntrega: turnoEntrega  ?? pedido.turnoEntrega,
-                puntoRetiro:  puntoRetiro   ?? pedido.puntoRetiro,
-                total:        nuevoTotal,
+                cantidad: nuevaCantidad,
+                turnoEntrega: turnoEntrega ?? pedido.turnoEntrega,
+                puntoRetiro: puntoRetiro ?? pedido.puntoRetiro,
+                total: nuevoTotal,
+                observaciones: observaciones ?? pedido.observaciones,
             },
         });
 
@@ -199,53 +192,50 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
     });
 }
 
-// ── Cambio de estado ──────────────────────────────────────────────────────────
-
-// Qué roles pueden ejecutar cada transición
 const TRANSICIONES = {
-    pendiente:  { confirmado: ["admin"], cancelado: ["admin", "usuario"] },
-    confirmado: { cancelado:  ["admin", "usuario"], entregado: ["admin"] },
+    pendiente: { confirmado: ["admin"], cancelado: ["admin", "usuario"] },
+    confirmado: { cancelado: ["admin", "usuario"], entregado: ["admin"] },
 };
 
 export async function cambiarEstado(id, nuevoEstado, usuarioId, rol) {
-    const db = await getDb();
-
-    const pedido = await db.get("SELECT * FROM pedidos WHERE id = ?", [id]);
-    if (!pedido) throw AppError("Pedido no encontrado", 404);
-
-    const transicionesDesde = TRANSICIONES[pedido.estado];
-    if (!transicionesDesde?.[nuevoEstado]) {
-        throw AppError(`No se puede pasar de "${pedido.estado}" a "${nuevoEstado}"`, 400);
-    }
-    if (!transicionesDesde[nuevoEstado].includes(rol)) {
-        throw AppError("No tenés permisos para esta transición", 403);
-    }
-    if (rol === "usuario" && pedido.usuarioId !== usuarioId) {
-        throw AppError("No tenés acceso a este pedido", 403);
-    }
-
-    const estadoAnterior = pedido.estado;
-
     return withTransaction(async (txDb) => {
-        await txDb.run("UPDATE pedidos SET estado = ? WHERE id = ?", [nuevoEstado, id]);
+        const pedido = await txDb.get("SELECT * FROM pedidos WHERE id = ?", [id]);
+        if (!pedido) throw AppError("Pedido no encontrado", 404);
+
+        const rolesPermitidos = TRANSICIONES[pedido.estado]?.[nuevoEstado];
+        if (!rolesPermitidos) {
+            throw AppError(`No se puede pasar de "${pedido.estado}" a "${nuevoEstado}"`, 400);
+        }
+        if (!rolesPermitidos.includes(rol)) {
+            throw AppError("No tenes permisos para esta transicion", 403);
+        }
+        if (rol === "usuario" && pedido.usuarioId !== usuarioId) {
+            throw AppError("No tenes acceso a este pedido", 403);
+        }
+
+        const result = await txDb.run(
+            "UPDATE pedidos SET estado = ? WHERE id = ? AND estado = ?",
+            [nuevoEstado, id, pedido.estado]
+        );
+        if (result.changes !== 1) {
+            throw AppError("El pedido cambio mientras se procesaba la solicitud", 409);
+        }
 
         await registrarHistorial(txDb, {
             pedidoId: id,
             usuarioId,
-            accion:        `estado:${estadoAnterior}->${nuevoEstado}`,
-            valorAnterior: { estado: estadoAnterior },
-            valorNuevo:    { estado: nuevoEstado },
+            accion: `estado:${pedido.estado}->${nuevoEstado}`,
+            valorAnterior: { estado: pedido.estado },
+            valorNuevo: { estado: nuevoEstado },
         });
 
         return fetchPedidoById(txDb, id);
     });
 }
 
-// ── Resumen admin ─────────────────────────────────────────────────────────────
-
 export async function obtenerResumen() {
-    const db  = await getDb();
-    const hoy = new Date().toISOString().split("T")[0];
+    const db = await getDb();
+    const hoy = getBusinessDate();
 
     const [porEstado, recaudado, menuDelDia] = await Promise.all([
         db.all(
@@ -260,7 +250,7 @@ export async function obtenerResumen() {
             `SELECT m.nombre, SUM(p.cantidad) AS totalPedido
              FROM pedidos p
              JOIN menus m ON m.id = p.menuId
-             WHERE p.fecha = ?
+             WHERE p.fecha = ? AND p.estado != 'cancelado'
              GROUP BY p.menuId
              ORDER BY totalPedido DESC
              LIMIT 1`,
@@ -271,14 +261,13 @@ export async function obtenerResumen() {
     return { porEstado, recaudado: recaudado.total, menuDelDia };
 }
 
-// ── Historial ─────────────────────────────────────────────────────────────────
-
 export async function obtenerHistorial(pedidoId, usuarioId, rol) {
     const db = await getDb();
-
-    const pedido = await db.get("SELECT * FROM pedidos WHERE id = ?", [pedidoId]);
+    const pedido = await db.get("SELECT usuarioId FROM pedidos WHERE id = ?", [pedidoId]);
     if (!pedido) throw AppError("Pedido no encontrado", 404);
-    if (rol === "usuario" && pedido.usuarioId !== usuarioId) throw AppError("No tenés acceso a este pedido", 403);
+    if (rol === "usuario" && pedido.usuarioId !== usuarioId) {
+        throw AppError("No tenes acceso a este pedido", 403);
+    }
 
     const historial = await db.all(
         `SELECT h.*, u.nombre AS usuarioNombre
@@ -289,10 +278,9 @@ export async function obtenerHistorial(pedidoId, usuarioId, rol) {
         [pedidoId]
     );
 
-    // Los valores se guardan como JSON strings — se parsean antes de devolver
-    return historial.map(h => ({
-        ...h,
-        valorAnterior: h.valorAnterior ? JSON.parse(h.valorAnterior) : null,
-        valorNuevo:    h.valorNuevo    ? JSON.parse(h.valorNuevo)    : null,
+    return historial.map(item => ({
+        ...item,
+        valorAnterior: item.valorAnterior ? JSON.parse(item.valorAnterior) : null,
+        valorNuevo: item.valorNuevo ? JSON.parse(item.valorNuevo) : null,
     }));
 }

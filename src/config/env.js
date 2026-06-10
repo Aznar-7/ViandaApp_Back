@@ -1,6 +1,30 @@
 import "dotenv/config";
 
+const NODE_ENV = process.env.NODE_ENV || "development";
+const rawCorsOrigins = process.env.CORS_ORIGIN
+    || (NODE_ENV === "production" ? "" : "http://localhost:5173");
+
+if (!rawCorsOrigins) {
+    throw new Error("CORS_ORIGIN es obligatorio en produccion");
+}
+
+function parseCorsOrigins(value) {
+    return value.split(",").map(origin => {
+        const normalized = origin.trim().replace(/\/$/, "");
+        const url = new URL(normalized);
+
+        if (!["http:", "https:"].includes(url.protocol) || url.origin !== normalized) {
+            throw new Error(`CORS_ORIGIN invalido: ${origin}`);
+        }
+
+        return normalized;
+    });
+}
+
 export const PORT        = process.env.PORT        || 3000;
-export const JWT_SECRET  = process.env.JWT_SECRET  || "your_jwt_secret_key";
+export const JWT_SECRET  = process.env.JWT_SECRET;
 export const DB_FILE     = process.env.DB_FILE     || "./data/database.sqlite";
-export const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+export const CORS_ORIGINS = parseCorsOrigins(rawCorsOrigins);
+export const BUSINESS_TIME_ZONE = process.env.BUSINESS_TIME_ZONE || "America/Argentina/Buenos_Aires";
+export const JWT_ISSUER = process.env.JWT_ISSUER || "viandas-api";
+export const JWT_AUDIENCE = process.env.JWT_AUDIENCE || "viandas-frontend";

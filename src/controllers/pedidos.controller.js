@@ -1,21 +1,29 @@
 import * as pedidosService from "../services/pedidos.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-
-const VALID_ORDERS = ["fecha", "estado", "total"];
-const VALID_ESTADOS = ["pendiente", "confirmado", "cancelado", "entregado"];
+import { ESTADOS_PEDIDO, ORDENES_PEDIDO } from "../domain/constants.js";
+import { isValidDateString } from "../utils/date.js";
 
 export const listarPedidos = asyncHandler(async (req, res) => {
     const { estado, fecha, order } = req.query;
 
-    if (order && !VALID_ORDERS.includes(order)) {
-        return res.status(400).json({ error: `"order" debe ser: ${VALID_ORDERS.join(", ")}` });
+    if (order && !ORDENES_PEDIDO.includes(order)) {
+        return res.status(400).json({ error: `"order" debe ser: ${ORDENES_PEDIDO.join(", ")}` });
     }
-    if (estado && !VALID_ESTADOS.includes(estado)) {
-        return res.status(400).json({ error: `"estado" debe ser: ${VALID_ESTADOS.join(", ")}` });
+    if (estado && !ESTADOS_PEDIDO.includes(estado)) {
+        return res.status(400).json({ error: `"estado" debe ser: ${ESTADOS_PEDIDO.join(", ")}` });
+    }
+    if (fecha && !isValidDateString(fecha)) {
+        return res.status(400).json({ error: "\"fecha\" debe ser una fecha valida con formato YYYY-MM-DD" });
     }
 
-    const page  = Math.max(Number(req.query.page)  || 1, 1);
-    const limit = Math.min(Number(req.query.limit) || 10, 100);
+    const page = req.query.page === undefined ? 1 : Number(req.query.page);
+    const limit = req.query.limit === undefined ? 10 : Number(req.query.limit);
+    if (!Number.isInteger(page) || page < 1) {
+        return res.status(400).json({ error: "\"page\" debe ser un numero entero positivo" });
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        return res.status(400).json({ error: "\"limit\" debe ser un entero entre 1 y 100" });
+    }
 
     const result = await pedidosService.listarPedidos({
         usuarioId: req.user.id,
@@ -27,7 +35,7 @@ export const listarPedidos = asyncHandler(async (req, res) => {
 
 export const obtenerPedido = asyncHandler(async (req, res) => {
     const pedido = await pedidosService.obtenerPedido(
-        Number(req.params.id), req.user.id, req.user.rol
+        req.validatedId, req.user.id, req.user.rol
     );
     res.json(pedido);
 });
@@ -42,28 +50,28 @@ export const crearPedido = asyncHandler(async (req, res) => {
 
 export const editarPedido = asyncHandler(async (req, res) => {
     const pedido = await pedidosService.editarPedido(
-        Number(req.params.id), req.user.id, req.user.rol, req.body
+        req.validatedId, req.user.id, req.user.rol, req.body
     );
     res.json(pedido);
 });
 
 export const cancelarPedido = asyncHandler(async (req, res) => {
     const pedido = await pedidosService.cambiarEstado(
-        Number(req.params.id), "cancelado", req.user.id, req.user.rol
+        req.validatedId, "cancelado", req.user.id, req.user.rol
     );
     res.json(pedido);
 });
 
 export const confirmarPedido = asyncHandler(async (req, res) => {
     const pedido = await pedidosService.cambiarEstado(
-        Number(req.params.id), "confirmado", req.user.id, req.user.rol
+        req.validatedId, "confirmado", req.user.id, req.user.rol
     );
     res.json(pedido);
 });
 
 export const entregarPedido = asyncHandler(async (req, res) => {
     const pedido = await pedidosService.cambiarEstado(
-        Number(req.params.id), "entregado", req.user.id, req.user.rol
+        req.validatedId, "entregado", req.user.id, req.user.rol
     );
     res.json(pedido);
 });
@@ -75,7 +83,7 @@ export const obtenerResumen = asyncHandler(async (req, res) => {
 
 export const obtenerHistorial = asyncHandler(async (req, res) => {
     const historial = await pedidosService.obtenerHistorial(
-        Number(req.params.id), req.user.id, req.user.rol
+        req.validatedId, req.user.id, req.user.rol
     );
     res.json(historial);
 });

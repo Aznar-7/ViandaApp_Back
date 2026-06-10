@@ -3,7 +3,7 @@ import { getDb } from "./db.js";
 
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS) || 10;
 
-async function seedDb() {
+export async function seedDb() {
     const db = await getDb();
 
     // Evitar doble seed
@@ -43,9 +43,10 @@ async function seedDb() {
         ];
 
         for (const [nombre, descripcion, fecha, tipo, precio, cupoDiario, activo] of menus) {
+            const imagenUrl = nombre.startsWith("Milanesa") ? "/assets/mondongo.jpg" : null;
             await db.run(
-                "INSERT INTO menus (nombre, descripcion, fecha, tipo, precio, cupoDiario, activo) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [nombre, descripcion, fecha, tipo, precio, cupoDiario, activo]
+                "INSERT INTO menus (nombre, descripcion, fecha, tipo, precio, cupoDiario, activo, imagenUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [nombre, descripcion, fecha, tipo, precio, cupoDiario, activo, imagenUrl]
             );
         }
 
@@ -94,6 +95,9 @@ async function seedDb() {
     console.log("  Usuario: maria@viandas.com  /  user123");
 }
 
-seedDb().catch((error) => {
-    console.error("Error sembrando datos:", error);
-});
+if (process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replace(/\\/g, "/")}`).href) {
+    seedDb().catch((error) => {
+        console.error("Error sembrando datos:", error);
+        process.exitCode = 1;
+    });
+}

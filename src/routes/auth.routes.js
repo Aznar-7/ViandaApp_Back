@@ -14,7 +14,13 @@ const authLimiter = rateLimit({
 
 const router = Router();
 
-router.post("/register", authLimiter, validate(registerSchema), authController.register);
-router.post("/login",    authLimiter, validate(loginSchema),    authController.login);
+function normalizeAuthBody(req, res, next) {
+    if (typeof req.body.email === "string") req.body.email = req.body.email.trim().toLowerCase();
+    if (typeof req.body.nombre === "string") req.body.nombre = req.body.nombre.trim();
+    next();
+}
+
+router.post("/register", authLimiter, normalizeAuthBody, validate(registerSchema), authController.register);
+router.post("/login",    authLimiter, normalizeAuthBody, validate(loginSchema),    authController.login);
 
 export default router;

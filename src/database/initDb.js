@@ -1,6 +1,6 @@
 import { getDb } from "./db.js";
 
-async function initDb() {
+export async function initDb() {
     const db = await getDb();
 
     await db.exec(`
@@ -21,7 +21,8 @@ async function initDb() {
       tipo TEXT NOT NULL CHECK (tipo IN ('clasico', 'vegetariano', 'vegano', 'sin_tacc')),
       precio REAL NOT NULL,
       cupoDiario INTEGER NOT NULL,
-      activo INTEGER NOT NULL DEFAULT 1
+      activo INTEGER NOT NULL DEFAULT 1,
+      imagenUrl TEXT
     );
 
     CREATE TABLE IF NOT EXISTS pedidos (
@@ -57,11 +58,17 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_pedidos_estado    ON pedidos(estado);
     CREATE INDEX IF NOT EXISTS idx_pedidos_fecha     ON pedidos(fecha);
     CREATE INDEX IF NOT EXISTS idx_pedidos_menuId    ON pedidos(menuId);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_menu_fecha_estado ON pedidos(menuId, fecha, estado);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_usuario_fecha ON pedidos(usuarioId, fecha DESC);
+    CREATE INDEX IF NOT EXISTS idx_historial_pedido_fecha ON historial_pedidos(pedidoId, fechaHora);
   `);
 
     console.log("Base de datos inicializada correctamente.");
 }
 
-initDb().catch((error) => {
-    console.error("Error inicializando la base:", error);
-});
+if (process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replace(/\\/g, "/")}`).href) {
+    initDb().catch((error) => {
+        console.error("Error inicializando la base:", error);
+        process.exitCode = 1;
+    });
+}

@@ -20,7 +20,7 @@ export async function listarMenus({ tipo, fecha, activo = 1 } = {}) {
         SELECT
             m.*,
             m.cupoDiario - COALESCE(SUM(
-                CASE WHEN p.estado IN ('pendiente', 'confirmado') THEN p.cantidad ELSE 0 END
+                CASE WHEN p.estado IN ('pendiente', 'confirmado', 'entregado') THEN p.cantidad ELSE 0 END
             ), 0) AS cupoDisponible
         FROM menus m
         LEFT JOIN pedidos p ON p.menuId = m.id AND p.fecha = m.fecha
