@@ -111,33 +111,37 @@ export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEnt
     if (!menu.activo) throw AppError("El menú no está activo", 400);
     if (menu.fecha !== fecha) throw AppError("El menú no está disponible para esa fecha", 400);
 
-    return withTransaction(async (db) => {
+    return withTransaction(async (txDb) => {
         // Cupo dentro de la transacción: BEGIN IMMEDIATE bloquea otros writers
-        const cupoDisponible = await calcularCupoDisponible(db, menuId, fecha);
+        const cupoDisponible = await calcularCupoDisponible(txDb, menuId, fecha);
         if (cantidad > cupoDisponible) throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
 
         const total = menu.precio * cantidad;
 
-        const { lastID } = await db.run(
+        const { lastID } = await txDb.run(
             `INSERT INTO pedidos (menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, estado, observaciones)
              VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente', ?)`,
             [menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, observaciones ?? null]
         );
 
-        await registrarHistorial(db, {
+        await registrarHistorial(txDb, {
             pedidoId: lastID,
             usuarioId,
             accion:    "creacion",
             valorNuevo: { estado: "pendiente", cantidad, total },
         });
 
-        return fetchPedidoById(db, lastID);
+        return fetchPedidoById(txDb, lastID);
     });
 }
 
 // ── Editar ────────────────────────────────────────────────────────────────────
 
 export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega, puntoRetiro, observaciones }) {
+    if ([cantidad, turnoEntrega, puntoRetiro, observaciones].every(v => v === undefined)) {
+        throw AppError("Debés enviar al menos un campo para editar", 400);
+    }
+
     const db = await getDb();
 
     const pedido = await db.get("SELECT * FROM pedidos WHERE id = ?", [id]);
@@ -152,9 +156,9 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
 
     const menu = await db.get("SELECT precio FROM menus WHERE id = ?", [pedido.menuId]);
 
-    return withTransaction(async (db) => {
+    return withTransaction(async (txDb) => {
         if (cantidad !== undefined && cantidad !== pedido.cantidad) {
-            const cupoDisponible = await calcularCupoDisponible(db, pedido.menuId, pedido.fecha, id);
+            const cupoDisponible = await calcularCupoDisponible(txDb, pedido.menuId, pedido.fecha, id);
             if (nuevaCantidad > cupoDisponible) throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
         }
 
@@ -166,7 +170,7 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
             total:        pedido.total,
         };
 
-        await db.run(
+        await txDb.run(
             `UPDATE pedidos SET cantidad = ?, turnoEntrega = ?, puntoRetiro = ?, total = ?, observaciones = ? WHERE id = ?`,
             [
                 nuevaCantidad,
@@ -178,7 +182,7 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
             ]
         );
 
-        await registrarHistorial(db, {
+        await registrarHistorial(txDb, {
             pedidoId: id,
             usuarioId,
             accion: "edicion",
@@ -191,7 +195,7 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
             },
         });
 
-        return fetchPedidoById(db, id);
+        return fetchPedidoById(txDb, id);
     });
 }
 
@@ -222,10 +226,10 @@ export async function cambiarEstado(id, nuevoEstado, usuarioId, rol) {
 
     const estadoAnterior = pedido.estado;
 
-    return withTransaction(async (db) => {
-        await db.run("UPDATE pedidos SET estado = ? WHERE id = ?", [nuevoEstado, id]);
+    return withTransaction(async (txDb) => {
+        await txDb.run("UPDATE pedidos SET estado = ? WHERE id = ?", [nuevoEstado, id]);
 
-        await registrarHistorial(db, {
+        await registrarHistorial(txDb, {
             pedidoId: id,
             usuarioId,
             accion:        `estado:${estadoAnterior}->${nuevoEstado}`,
@@ -233,7 +237,7 @@ export async function cambiarEstado(id, nuevoEstado, usuarioId, rol) {
             valorNuevo:    { estado: nuevoEstado },
         });
 
-        return fetchPedidoById(db, id);
+        return fetchPedidoById(txDb, id);
     });
 }
 

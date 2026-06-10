@@ -2,6 +2,7 @@ import * as pedidosService from "../services/pedidos.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const VALID_ORDERS = ["fecha", "estado", "total"];
+const VALID_ESTADOS = ["pendiente", "confirmado", "cancelado", "entregado"];
 
 export const listarPedidos = asyncHandler(async (req, res) => {
     const { estado, fecha, order } = req.query;
@@ -9,8 +10,11 @@ export const listarPedidos = asyncHandler(async (req, res) => {
     if (order && !VALID_ORDERS.includes(order)) {
         return res.status(400).json({ error: `"order" debe ser: ${VALID_ORDERS.join(", ")}` });
     }
+    if (estado && !VALID_ESTADOS.includes(estado)) {
+        return res.status(400).json({ error: `"estado" debe ser: ${VALID_ESTADOS.join(", ")}` });
+    }
 
-    const page  = Number(req.query.page)  || 1;
+    const page  = Math.max(Number(req.query.page)  || 1, 1);
     const limit = Math.min(Number(req.query.limit) || 10, 100);
 
     const result = await pedidosService.listarPedidos({

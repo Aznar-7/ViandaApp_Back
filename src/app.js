@@ -11,7 +11,7 @@ import pedidosRoutes from "./routes/pedidos.routes.js";
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: CORS_ORIGIN }));
+app.use(cors({ origin: CORS_ORIGIN.split(",").map(o => o.trim()) }));
 app.use(express.json({ limit: "10kb" }));
 if (!process.env.JEST_WORKER_ID) app.use(morgan("dev"));
 

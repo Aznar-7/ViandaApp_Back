@@ -6,7 +6,7 @@ import { AppError } from "../utils/AppErrors.js";
 
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS) || 10;
 
-export async function register(nombre, email, password, rol = "usuario") {
+export async function register(nombre, email, password) {
     const db = await getDb();
 
     const existente = await db.get("SELECT id FROM usuarios WHERE email = ?", [email]);
@@ -16,10 +16,10 @@ export async function register(nombre, email, password, rol = "usuario") {
 
     const { lastID } = await db.run(
         "INSERT INTO usuarios (nombre, email, passwordHash, rol, activo) VALUES (?, ?, ?, ?, ?)",
-        [nombre, email, passwordHash, rol, 1]
+        [nombre, email, passwordHash, "usuario", 1]
     );
 
-    return { id: lastID, nombre, email, rol, activo: 1 };
+    return { id: lastID, nombre, email, rol: "usuario", activo: 1 };
 }
 
 export async function login(email, password) {

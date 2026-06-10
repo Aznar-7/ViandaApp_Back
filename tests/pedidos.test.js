@@ -17,6 +17,14 @@ beforeAll(async () => {
     userToken  = userRes.body.token;
 
     const db = await getDb();
+
+    // Auto-cleanup: elimina pedidos de test de runs anteriores que crashearon antes de afterAll
+    const leftovers = await db.all("SELECT id FROM pedidos WHERE puntoRetiro = 'Sede test'");
+    for (const { id } of leftovers) {
+        await db.run("DELETE FROM historial_pedidos WHERE pedidoId = ?", [id]);
+        await db.run("DELETE FROM pedidos WHERE id = ?", [id]);
+    }
+
     [pedidoExistente, pedidoEditable, pedidoEntregado] = await Promise.all([
         db.get("SELECT id FROM pedidos LIMIT 1"),
         db.get("SELECT p.*, m.cupoDiario FROM pedidos p JOIN menus m ON m.id = p.menuId WHERE p.estado IN ('pendiente','confirmado') LIMIT 1"),

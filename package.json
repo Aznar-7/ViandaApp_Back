@@ -10,6 +10,7 @@
     "init-db": "node src/database/initDb.js",
     "seed": "node src/database/seedDb.js"
   },
+  "engines": { "node": ">=18" },
   "keywords": [],
   "author": "",
   "license": "ISC",

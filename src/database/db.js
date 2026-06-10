@@ -15,6 +15,7 @@ export async function getDb() {
         });
 
         await db.run("PRAGMA journal_mode = WAL");
+        await db.run("PRAGMA busy_timeout = 5000");
         await db.run("PRAGMA foreign_keys = ON");
     }
 
