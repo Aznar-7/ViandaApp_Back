@@ -19,3 +19,10 @@ export async function getDb() {
 
     return db;
 }
+
+export async function closeDb() {
+    if (db) {
+        await db.close();
+        db = null;
+    }
+}
