@@ -1,35 +1,33 @@
-# Viandas Back
+<div align="center">
 
-Backend para el sistema de gestión de pedidos de viandas con cupos diarios.
-Node.js · Express · SQLite · JWT
+# 🍱 Viandas API
+
+**Backend RESTful para gestión de pedidos de viandas con cupos diarios.**
+
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#)
+[![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white)](#)
+[![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)](#)
+[![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=jsonwebtokens&logoColor=white)](#)
+[![Jest](https://img.shields.io/badge/Jest-C21325?style=for-the-badge&logo=jest&logoColor=white)](#)
+
+</div>
 
 ---
 
-## Requisitos
-
-- Node.js 18+
-- npm
-
----
-
-## Instalación y ejecución
+## ⚡ Quickstart
 
 ```bash
 npm install
-npm run init-db
-npm run seed
-npm run dev
+npm run init-db   # crea las tablas
+npm run seed      # carga datos de prueba
+npm run dev       # 🚀 http://localhost:3000
 ```
-
-El servidor queda en `http://localhost:3000`.
-
-Para producción: `npm start`
 
 ---
 
-## Variables de entorno
+## 🔐 Variables de entorno
 
-Archivo `.env` en la raíz del proyecto:
+`.env` en la raíz:
 
 ```env
 PORT=3000
@@ -39,70 +37,68 @@ DB_FILE=./data/database.sqlite
 
 ---
 
-## Credenciales del seed
+## 👥 Credenciales del seed
 
 | Rol | Email | Password |
 |---|---|---|
-| Administrador | admin@viandas.com | admin123 |
-| Usuario | juan@viandas.com | user123 |
-| Usuario | maria@viandas.com | user123 |
+| 👑 Admin | admin@viandas.com | admin123 |
+| 🙍 Usuario | juan@viandas.com | user123 |
+| 🙍 Usuario | maria@viandas.com | user123 |
 
-El seed carga además 6 menús y 12 pedidos distribuidos en todos los estados.
+> El seed también carga **6 menús** y **12 pedidos** distribuidos en todos los estados.
 
 ---
 
-## Endpoints
+## 🗺️ Endpoints
 
-### Autenticación (público)
+### 🔓 Auth — público
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/api/auth/register` | Registrar usuario |
-| POST | `/api/auth/login` | Login → devuelve JWT |
+| `POST` | `/api/auth/register` | Crear cuenta |
+| `POST` | `/api/auth/login` | Login → devuelve JWT |
 
-**Body register:**
 ```json
+// POST /register
 { "nombre": "string", "email": "string", "password": "string" }
-```
 
-**Body login:**
-```json
+// POST /login
 { "email": "string", "password": "string" }
 ```
 
 ---
 
-### Menús (público)
+### 🍽️ Menús — público
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/api/menus` | Listar menús con cupo disponible calculado |
+| `GET` | `/api/menus` | Listar menús con cupo disponible |
 
-**Query params opcionales:** `tipo`, `fecha`, `activo`
+**Query params:** `tipo` · `fecha` · `activo`
 
 ---
 
-### Pedidos (requiere JWT)
+### 📦 Pedidos — requiere JWT
 
 | Método | Ruta | Roles | Descripción |
 |---|---|---|---|
-| GET | `/api/pedidos` | admin, usuario | Listar pedidos paginados |
-| GET | `/api/pedidos/resumen` | admin | Resumen por estado y recaudación |
-| GET | `/api/pedidos/:id` | admin, usuario | Detalle de un pedido |
-| GET | `/api/pedidos/:id/historial` | admin, usuario | Historial de cambios del pedido |
-| POST | `/api/pedidos` | admin, usuario | Crear pedido |
-| PUT | `/api/pedidos/:id` | admin, usuario | Editar pedido |
-| PATCH | `/api/pedidos/:id/cancelar` | admin, usuario | Cancelar pedido |
-| PATCH | `/api/pedidos/:id/confirmar` | admin | Confirmar pedido |
-| PATCH | `/api/pedidos/:id/entregar` | admin | Marcar como entregado |
+| `GET` | `/api/pedidos` | 👑 🙍 | Listado paginado |
+| `GET` | `/api/pedidos/resumen` | 👑 | Resumen admin |
+| `GET` | `/api/pedidos/:id` | 👑 🙍 | Detalle |
+| `GET` | `/api/pedidos/:id/historial` | 👑 🙍 | Historial de cambios |
+| `POST` | `/api/pedidos` | 👑 🙍 | Crear pedido |
+| `PUT` | `/api/pedidos/:id` | 👑 🙍 | Editar pedido |
+| `PATCH` | `/api/pedidos/:id/cancelar` | 👑 🙍 | Cancelar |
+| `PATCH` | `/api/pedidos/:id/confirmar` | 👑 | Confirmar |
+| `PATCH` | `/api/pedidos/:id/entregar` | 👑 | Marcar entregado |
 
-**Query params para `GET /api/pedidos`:** `estado`, `fecha`, `page`, `limit`, `order`
+**Query params para listado:** `estado` · `fecha` · `page` · `limit` · `order`
 
-El usuario solo puede ver y modificar sus propios pedidos. El admin ve todos.
+> 🙍 El usuario solo ve y opera sus propios pedidos. 👑 El admin ve todo.
 
 ---
 
-## JWT
+## 🪙 JWT
 
 El login devuelve:
 
@@ -118,109 +114,106 @@ El login devuelve:
 { "id": 1, "email": "admin@viandas.com", "rol": "admin" }
 ```
 
-- Expiración: **8 horas**
-- No incluye `passwordHash` ni datos sensibles
+| | |
+|---|---|
+| ⏱️ Expiración | 8 horas |
+| 🔒 Datos sensibles | No incluye `passwordHash` |
 
-**Cómo enviarlo en cada request:**
+**Cómo enviarlo:**
 ```
 Authorization: Bearer <token>
 ```
 
 ---
 
-## Roles y permisos
+## 🛡️ Roles y permisos
 
-### Usuario
+### 🙍 Usuario
 - Crear pedidos propios
-- Ver sus pedidos y el historial
+- Ver sus pedidos e historial
 - Cancelar y editar sus pedidos en estado `pendiente` o `confirmado`
 
-### Administrador
-- Todo lo anterior sobre cualquier pedido
-- Confirmar pedidos (`pendiente → confirmado`)
-- Marcar como entregados (`confirmado → entregado`)
+### 👑 Administrador
+- Todo lo anterior sobre **cualquier** pedido
+- Confirmar pedidos
+- Marcar pedidos como entregados
 - Ver el resumen administrativo
 
 ---
 
-## Flujo de estados
+## 🔄 Flujo de estados
 
 ```
-pendiente ──► confirmado ──► entregado
-    │               │
-    └───────────────┴──► cancelado
+  pendiente ──────► confirmado ──────► entregado
+      │                  │
+      └──────────────────┴──────────► cancelado
 ```
 
-| Transición | Quién puede ejecutarla |
+| Transición | Quién |
 |---|---|
-| `pendiente → confirmado` | Admin |
-| `pendiente → cancelado` | Admin, Usuario dueño |
-| `confirmado → cancelado` | Admin, Usuario dueño |
-| `confirmado → entregado` | Admin |
+| `pendiente → confirmado` | 👑 Admin |
+| `pendiente → cancelado` | 👑 Admin · 🙍 Dueño |
+| `confirmado → cancelado` | 👑 Admin · 🙍 Dueño |
+| `confirmado → entregado` | 👑 Admin |
 
-Cualquier otra transición devuelve **400**.
-
----
-
-## Cálculo de cupos
-
-```
-cupoDisponible = cupoDiario − Σ(cantidades de pedidos en estado pendiente o confirmado)
-```
-
-- Los pedidos `cancelado` y `entregado` **no consumen cupo**
-- Al **crear** un pedido se valida contra el cupo disponible
-- Al **editar** la cantidad, el pedido actual se excluye del conteo para no contarse dos veces
-- El campo `total` siempre lo calcula el backend como `precio × cantidad`. El cliente no puede enviarlo
+> Cualquier otra transición → **400**
 
 ---
 
-## Testing
+## 📐 Cálculo de cupos
 
-Los tests requieren base de datos inicializada con datos semilla:
+```
+cupoDisponible = cupoDiario − Σ( cantidades en estado pendiente o confirmado )
+```
+
+- `cancelado` y `entregado` **no consumen cupo**
+- Al **crear**: se valida contra el cupo disponible
+- Al **editar**: el pedido actual se excluye del conteo para no contarse dos veces
+- `total` siempre lo calcula el backend → `precio × cantidad`
+
+---
+
+## 🧪 Testing
 
 ```bash
-npm run init-db
-npm run seed
-npm test
+npm run init-db && npm run seed   # base de datos lista
+npm test                          # 12 tests, todos verdes
 ```
 
-**12 tests** (Jest + Supertest):
-
-| # | Caso | Status esperado |
+| # | Caso | HTTP |
 |---|---|---|
-| 1 | Login correcto | 200 |
-| 2 | Login con password inválida | 401 |
-| 3 | Listado de pedidos con filtro de estado | 200 |
-| 4 | Detalle de pedido existente | 200 |
-| 5 | Detalle de pedido inexistente | 404 |
-| 6 | Alta válida | 201 |
-| 7 | Alta con cantidad ≤ 0 | 400 |
-| 8 | Alta sin cupo disponible | 400 |
-| 9 | Acceso a ruta protegida sin JWT | 401 |
-| 10 | Confirmar pedido como usuario (sin permisos) | 403 |
-| 11 | Edición que supera el cupo disponible | 400 |
-| 12 | Edición de pedido en estado entregado | 400 |
+| 1 | Login correcto | `200` |
+| 2 | Login con password inválida | `401` |
+| 3 | Listado con filtro de estado | `200` |
+| 4 | Detalle de pedido existente | `200` |
+| 5 | Detalle de pedido inexistente | `404` |
+| 6 | Alta válida | `201` |
+| 7 | Alta con cantidad ≤ 0 | `400` |
+| 8 | Alta sin cupo disponible | `400` |
+| 9 | Acceso sin JWT | `401` |
+| 10 | Confirmar como usuario | `403` |
+| 11 | Edición que supera cupo | `400` |
+| 12 | Edición de pedido entregado | `400` |
 
-Los tests limpian los datos que crean → son repetibles.
+> Los tests limpian los datos que crean → son **repetibles**.
 
 ---
 
-## Estructura del proyecto
+## 🗂️ Estructura del proyecto
 
 ```
 src/
 ├── config/
-│   └── env.js                  Variables de entorno
+│   └── env.js                  variables de entorno
 ├── database/
-│   ├── db.js                   Conexión SQLite (singleton)
-│   ├── initDb.js               Creación de tablas
-│   └── seedDb.js               Datos de prueba
+│   ├── db.js                   conexión SQLite (singleton)
+│   ├── initDb.js               creación de tablas
+│   └── seedDb.js               datos de prueba
 ├── middlewares/
-│   ├── authenticate.js         Verificación JWT → req.user
-│   ├── authorize.js            Control de roles
-│   ├── errorHandler.js         Manejo centralizado de errores
-│   └── validate.js             Validación de body por schema
+│   ├── authenticate.js         verificación JWT → req.user
+│   ├── authorize.js            control de roles
+│   ├── errorHandler.js         manejo centralizado de errores
+│   └── validate.js             validación de body por schema
 ├── validators/
 │   ├── auth.validators.js
 │   └── pedidos.validators.js
@@ -247,23 +240,29 @@ tests/
 
 ---
 
-## Códigos HTTP
+## 📡 Códigos HTTP
 
 | Código | Significado |
 |---|---|
-| 200 | OK |
-| 201 | Recurso creado |
-| 400 | Error de validación o regla de negocio |
-| 401 | Token ausente o inválido |
-| 403 | Sin permisos para la operación |
-| 404 | Recurso no encontrado |
-| 500 | Error interno del servidor |
+| `200` | OK |
+| `201` | Recurso creado |
+| `400` | Error de validación o regla de negocio |
+| `401` | Token ausente o inválido |
+| `403` | Sin permisos para la operación |
+| `404` | Recurso no encontrado |
+| `500` | Error interno del servidor |
 
 ---
 
-## Limitaciones conocidas
+## ⚠️ Limitaciones conocidas
 
-- SQLite es un archivo local: no apto para múltiples instancias del servidor corriendo en paralelo.
-- No hay refresh token: al expirar el JWT (8h) el usuario debe hacer login nuevamente.
-- Los menús no tienen CRUD desde la API: se gestionan mediante el seed.
-- Los tests comparten la base de datos de desarrollo. Ejecutar `npm run seed` antes de `npm test` es obligatorio.
+- **SQLite local**: no apto para múltiples instancias del servidor en paralelo.
+- **Sin refresh token**: al expirar el JWT (8h) hay que hacer login de nuevo.
+- **Menús sin CRUD**: se gestionan únicamente mediante el seed.
+- **Tests sobre la DB de desarrollo**: ejecutar el seed antes de correr tests es obligatorio.
+
+---
+
+<div align="center">
+  <sub>Desarrollado para DDS 2026 · Curso 3K2</sub>
+</div>
