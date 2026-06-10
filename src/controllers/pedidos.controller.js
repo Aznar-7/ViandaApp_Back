@@ -1,105 +1,77 @@
 import * as pedidosService from "../services/pedidos.service.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
-export async function listarPedidos(req, res, next) {
-    try {
-        const { estado, fecha, order } = req.query;
-        const page  = Number(req.query.page)  || 1;
-        const limit = Number(req.query.limit) || 10;
+const VALID_ORDERS = ["fecha", "estado", "total"];
 
-        const result = await pedidosService.listarPedidos({
-            usuarioId: req.user.id,
-            rol:       req.user.rol,
-            estado, fecha, page, limit, order,
-        });
-        res.json(result);
-    } catch (error) {
-        next(error);
+export const listarPedidos = asyncHandler(async (req, res) => {
+    const { estado, fecha, order } = req.query;
+
+    if (order && !VALID_ORDERS.includes(order)) {
+        return res.status(400).json({ error: `"order" debe ser: ${VALID_ORDERS.join(", ")}` });
     }
-}
 
-export async function obtenerPedido(req, res, next) {
-    try {
-        const pedido = await pedidosService.obtenerPedido(
-            Number(req.params.id), req.user.id, req.user.rol
-        );
-        res.json(pedido);
-    } catch (error) {
-        next(error);
-    }
-}
+    const page  = Number(req.query.page)  || 1;
+    const limit = Math.min(Number(req.query.limit) || 10, 100);
 
-export async function crearPedido(req, res, next) {
-    try {
-        const { menuId, fecha, cantidad, turnoEntrega, puntoRetiro, observaciones } = req.body;
-        const pedido = await pedidosService.crearPedido({
-            menuId, usuarioId: req.user.id, fecha, cantidad, turnoEntrega, puntoRetiro, observaciones,
-        });
-        res.status(201).json(pedido);
-    } catch (error) {
-        next(error);
-    }
-}
+    const result = await pedidosService.listarPedidos({
+        usuarioId: req.user.id,
+        rol:       req.user.rol,
+        estado, fecha, page, limit, order,
+    });
+    res.json(result);
+});
 
-export async function editarPedido(req, res, next) {
-    try {
-        const pedido = await pedidosService.editarPedido(
-            Number(req.params.id), req.user.id, req.user.rol, req.body
-        );
-        res.json(pedido);
-    } catch (error) {
-        next(error);
-    }
-}
+export const obtenerPedido = asyncHandler(async (req, res) => {
+    const pedido = await pedidosService.obtenerPedido(
+        Number(req.params.id), req.user.id, req.user.rol
+    );
+    res.json(pedido);
+});
 
-export async function cancelarPedido(req, res, next) {
-    try {
-        const pedido = await pedidosService.cambiarEstado(
-            Number(req.params.id), "cancelado", req.user.id, req.user.rol
-        );
-        res.json(pedido);
-    } catch (error) {
-        next(error);
-    }
-}
+export const crearPedido = asyncHandler(async (req, res) => {
+    const { menuId, fecha, cantidad, turnoEntrega, puntoRetiro, observaciones } = req.body;
+    const pedido = await pedidosService.crearPedido({
+        menuId, usuarioId: req.user.id, fecha, cantidad, turnoEntrega, puntoRetiro, observaciones,
+    });
+    res.status(201).json(pedido);
+});
 
-export async function confirmarPedido(req, res, next) {
-    try {
-        const pedido = await pedidosService.cambiarEstado(
-            Number(req.params.id), "confirmado", req.user.id, req.user.rol
-        );
-        res.json(pedido);
-    } catch (error) {
-        next(error);
-    }
-}
+export const editarPedido = asyncHandler(async (req, res) => {
+    const pedido = await pedidosService.editarPedido(
+        Number(req.params.id), req.user.id, req.user.rol, req.body
+    );
+    res.json(pedido);
+});
 
-export async function entregarPedido(req, res, next) {
-    try {
-        const pedido = await pedidosService.cambiarEstado(
-            Number(req.params.id), "entregado", req.user.id, req.user.rol
-        );
-        res.json(pedido);
-    } catch (error) {
-        next(error);
-    }
-}
+export const cancelarPedido = asyncHandler(async (req, res) => {
+    const pedido = await pedidosService.cambiarEstado(
+        Number(req.params.id), "cancelado", req.user.id, req.user.rol
+    );
+    res.json(pedido);
+});
 
-export async function obtenerResumen(req, res, next) {
-    try {
-        const resumen = await pedidosService.obtenerResumen();
-        res.json(resumen);
-    } catch (error) {
-        next(error);
-    }
-}
+export const confirmarPedido = asyncHandler(async (req, res) => {
+    const pedido = await pedidosService.cambiarEstado(
+        Number(req.params.id), "confirmado", req.user.id, req.user.rol
+    );
+    res.json(pedido);
+});
 
-export async function obtenerHistorial(req, res, next) {
-    try {
-        const historial = await pedidosService.obtenerHistorial(
-            Number(req.params.id), req.user.id, req.user.rol
-        );
-        res.json(historial);
-    } catch (error) {
-        next(error);
-    }
-}
+export const entregarPedido = asyncHandler(async (req, res) => {
+    const pedido = await pedidosService.cambiarEstado(
+        Number(req.params.id), "entregado", req.user.id, req.user.rol
+    );
+    res.json(pedido);
+});
+
+export const obtenerResumen = asyncHandler(async (req, res) => {
+    const resumen = await pedidosService.obtenerResumen();
+    res.json(resumen);
+});
+
+export const obtenerHistorial = asyncHandler(async (req, res) => {
+    const historial = await pedidosService.obtenerHistorial(
+        Number(req.params.id), req.user.id, req.user.rol
+    );
+    res.json(historial);
+});

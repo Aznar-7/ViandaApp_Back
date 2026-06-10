@@ -4,21 +4,27 @@ import { getDb, closeDb } from "../src/database/db.js";
 
 let adminToken;
 let userToken;
+let pedidoExistente;      // cualquier pedido (para test detalle)
+let pedidoEditable;       // pendiente o confirmado con cupo conocido (para test cupo)
+let pedidoEntregado;      // entregado (para test edición inválida)
 
 beforeAll(async () => {
-    const adminRes = await request(app)
-        .post("/api/auth/login")
-        .send({ email: "admin@viandas.com", password: "admin123" });
+    const [adminRes, userRes] = await Promise.all([
+        request(app).post("/api/auth/login").send({ email: "admin@viandas.com", password: "admin123" }),
+        request(app).post("/api/auth/login").send({ email: "juan@viandas.com",  password: "user123"  }),
+    ]);
     adminToken = adminRes.body.token;
+    userToken  = userRes.body.token;
 
-    const userRes = await request(app)
-        .post("/api/auth/login")
-        .send({ email: "juan@viandas.com", password: "user123" });
-    userToken = userRes.body.token;
+    const db = await getDb();
+    [pedidoExistente, pedidoEditable, pedidoEntregado] = await Promise.all([
+        db.get("SELECT id FROM pedidos LIMIT 1"),
+        db.get("SELECT p.*, m.cupoDiario FROM pedidos p JOIN menus m ON m.id = p.menuId WHERE p.estado IN ('pendiente','confirmado') LIMIT 1"),
+        db.get("SELECT id FROM pedidos WHERE estado = 'entregado' LIMIT 1"),
+    ]);
 });
 
 afterAll(async () => {
-    // Eliminar pedidos creados por los tests para que sean repetibles
     const db = await getDb();
     const testPedidos = await db.all("SELECT id FROM pedidos WHERE puntoRetiro = 'Sede test'");
     for (const { id } of testPedidos) {
@@ -44,18 +50,18 @@ describe("Pedidos", () => {
     // Test 4
     it("detalle de pedido existente → 200 con el objeto", async () => {
         const res = await request(app)
-            .get("/api/pedidos/1")
+            .get(`/api/pedidos/${pedidoExistente.id}`)
             .set("Authorization", `Bearer ${adminToken}`);
 
         expect(res.status).toBe(200);
-        expect(res.body.id).toBe(1);
+        expect(res.body.id).toBe(pedidoExistente.id);
         expect(res.body.menuNombre).toBeDefined();
     });
 
     // Test 5
     it("detalle de pedido inexistente → 404", async () => {
         const res = await request(app)
-            .get("/api/pedidos/9999")
+            .get("/api/pedidos/9999999")
             .set("Authorization", `Bearer ${adminToken}`);
 
         expect(res.status).toBe(404);
@@ -76,7 +82,7 @@ describe("Pedidos", () => {
 
         expect(res.status).toBe(201);
         expect(res.body.estado).toBe("pendiente");
-        expect(res.body.total).toBe(800); // precio 800 × cantidad 1
+        expect(res.body.total).toBe(800);
     });
 
     // Test 7
@@ -115,14 +121,13 @@ describe("Pedidos", () => {
     // Test 9
     it("acceso a ruta protegida sin JWT → 401", async () => {
         const res = await request(app).get("/api/pedidos");
-
         expect(res.status).toBe(401);
     });
 
     // Test 10
     it("confirmar pedido como usuario (no admin) → 403", async () => {
         const res = await request(app)
-            .patch("/api/pedidos/3/confirmar")
+            .patch(`/api/pedidos/${pedidoEditable.id}/confirmar`)
             .set("Authorization", `Bearer ${userToken}`);
 
         expect(res.status).toBe(403);
@@ -130,13 +135,11 @@ describe("Pedidos", () => {
 
     // Test 11
     it("edición que supera cupo → 400", async () => {
-        // Pedido 1: menuId:1 (cupoDiario:15). Excluyendo pedido 1,
-        // solo pedido 2 (entregado) no cuenta → cupoDisponible = 15.
-        // Pedir cantidad:100 debe fallar.
+        // Pedimos más que el cupoDiario completo del menú → siempre falla
         const res = await request(app)
-            .put("/api/pedidos/1")
+            .put(`/api/pedidos/${pedidoEditable.id}`)
             .set("Authorization", `Bearer ${adminToken}`)
-            .send({ cantidad: 100 });
+            .send({ cantidad: pedidoEditable.cupoDiario + 1000 });
 
         expect(res.status).toBe(400);
         expect(res.body.error).toMatch(/cupo insuficiente/i);
@@ -144,9 +147,8 @@ describe("Pedidos", () => {
 
     // Test 12
     it("edición de pedido entregado → 400", async () => {
-        // Pedido 2 está en estado 'entregado' desde el seed
         const res = await request(app)
-            .put("/api/pedidos/2")
+            .put(`/api/pedidos/${pedidoEntregado.id}`)
             .set("Authorization", `Bearer ${adminToken}`)
             .send({ observaciones: "intento de edicion" });
 

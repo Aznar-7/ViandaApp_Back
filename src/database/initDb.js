@@ -52,6 +52,13 @@ async function initDb() {
     );
   `);
 
+    await db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_pedidos_usuarioId ON pedidos(usuarioId);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_estado    ON pedidos(estado);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_fecha     ON pedidos(fecha);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_menuId    ON pedidos(menuId);
+  `);
+
     console.log("Base de datos inicializada correctamente.");
 }
 

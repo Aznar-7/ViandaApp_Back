@@ -4,13 +4,15 @@ import { getDb } from "../database/db.js";
 import { JWT_SECRET } from "../config/env.js";
 import { AppError } from "../utils/AppErrors.js";
 
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS) || 10;
+
 export async function register(nombre, email, password, rol = "usuario") {
     const db = await getDb();
 
     const existente = await db.get("SELECT id FROM usuarios WHERE email = ?", [email]);
     if (existente) throw AppError("El email ya está registrado", 400);
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     const { lastID } = await db.run(
         "INSERT INTO usuarios (nombre, email, passwordHash, rol, activo) VALUES (?, ?, ?, ?, ?)",

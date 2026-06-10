@@ -14,6 +14,7 @@ export async function getDb() {
             driver: sqlite3.Database,
         });
 
+        await db.run("PRAGMA journal_mode = WAL");
         await db.run("PRAGMA foreign_keys = ON");
     }
 

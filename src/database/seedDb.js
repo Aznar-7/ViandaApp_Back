@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import { getDb } from "./db.js";
 
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS) || 10;
+
 async function seedDb() {
     const db = await getDb();
 
@@ -12,9 +14,11 @@ async function seedDb() {
     }
 
     // ── Usuarios ──────────────────────────────────────────────────────────────
-    const passAdmin = await bcrypt.hash("admin123", 10);
-    const passUser  = await bcrypt.hash("user123", 10);
+    const passAdmin = await bcrypt.hash("admin123", BCRYPT_ROUNDS);
+    const passUser  = await bcrypt.hash("user123",  BCRYPT_ROUNDS);
 
+    await db.run("BEGIN");
+    try {
     await db.run(
         "INSERT INTO usuarios (nombre, email, passwordHash, rol, activo) VALUES (?, ?, ?, ?, ?)",
         ["Admin",         "admin@viandas.com", passAdmin, "admin",   1]
@@ -78,6 +82,12 @@ async function seedDb() {
              VALUES (?, ?, ?, ?, ?)`,
             [lastID, usuarioId, "creacion", ahora, JSON.stringify({ estado })]
         );
+    }
+
+    await db.run("COMMIT");
+    } catch (err) {
+        await db.run("ROLLBACK");
+        throw err;
     }
 
     console.log("Datos sembrados correctamente.");
