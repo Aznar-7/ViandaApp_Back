@@ -105,6 +105,18 @@ Valores de `tipo`: `clasico`, `vegetariano`, `vegano`, `sin_tacc`.
 backend, por ejemplo: `http://localhost:3000${menu.imagenUrl}`. Si llega `null`,
 el frontend debe mostrar un placeholder.
 
+Para sincronizar las rutas de imagen en una base ya sembrada:
+
+```bash
+npm run sync-menu-images
+```
+
+Para sincronizar todo el catalogo seed e insertar menús faltantes:
+
+```bash
+npm run sync-menus
+```
+
 ### Pedido
 
 ```json

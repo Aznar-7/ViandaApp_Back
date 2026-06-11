@@ -20,6 +20,8 @@
 npm install
 npm run init-db   # crea las tablas
 npm run seed      # carga datos de prueba
+npm run sync-menus # actualiza/inserta el catalogo seed sin borrar datos
+npm run sync-menu-images # actualiza imagenUrl sin borrar datos existentes
 npm run dev       # 🚀 http://localhost:3000
 ```
 
@@ -86,6 +88,15 @@ SEED_ON_START=false
 - SQLite necesita un Persistent Disk montado en `/var/data`. Sin disco
   persistente, Render puede perder toda la base al reiniciar o desplegar.
 - Para escalar a mas de una instancia, migrar SQLite a PostgreSQL.
+
+Para incorporar cambios del catalogo seed en una base persistente ya existente:
+
+```bash
+npm run sync-menus
+```
+
+Este comando actualiza los menús seed con IDs `1` a `12` e inserta los faltantes,
+sin borrar usuarios ni pedidos.
 
 Healthchecks:
 

@@ -8,7 +8,9 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "init-db": "node src/database/initDb.js",
-    "seed": "node src/database/seedDb.js"
+    "seed": "node src/database/seedDb.js",
+    "sync-menus": "node src/database/syncMenus.js",
+    "sync-menu-images": "node src/database/syncMenuImages.js"
   },
   "engines": { "node": ">=18" },
   "keywords": [],
