@@ -8,69 +8,68 @@ const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS) || 10;
 export async function seedDb() {
     const db = await getDb();
 
-    // Evitar doble seed
-    const { count } = await db.get("SELECT COUNT(*) as count FROM usuarios");
+    const { count } = await db.get("SELECT COUNT(*) AS count FROM usuarios");
     if (count > 0) {
         console.log("Los datos ya fueron sembrados, saliendo.");
         return;
     }
 
-    // ── Usuarios ──────────────────────────────────────────────────────────────
     const passAdmin = await bcrypt.hash("admin123", BCRYPT_ROUNDS);
-    const passUser  = await bcrypt.hash("user123",  BCRYPT_ROUNDS);
+    const passUser = await bcrypt.hash("user123", BCRYPT_ROUNDS);
 
     await db.run("BEGIN");
     try {
         await db.run(
             "INSERT INTO usuarios (nombre, email, passwordHash, rol, activo) VALUES (?, ?, ?, ?, ?)",
-            ["Admin",         "admin@viandas.com", passAdmin, "admin",   1]
+            ["Admin", "admin@viandas.com", passAdmin, "admin", 1]
         );
         await db.run(
             "INSERT INTO usuarios (nombre, email, passwordHash, rol, activo) VALUES (?, ?, ?, ?, ?)",
-            ["Juan Pérez",    "juan@viandas.com",  passUser,  "usuario", 1]
+            ["Juan Perez", "juan@viandas.com", passUser, "usuario", 1]
         );
         await db.run(
             "INSERT INTO usuarios (nombre, email, passwordHash, rol, activo) VALUES (?, ?, ?, ?, ?)",
-            ["María García",  "maria@viandas.com", passUser,  "usuario", 1]
+            ["Maria Garcia", "maria@viandas.com", passUser, "usuario", 1]
         );
 
-        // ── Menús ─────────────────────────────────────────────────────────────
         const menus = [
-            ["Milanesa con puré",    "Milanesa de ternera con puré de papas",        "2026-06-09", "clasico",      1200, 15, 1],
-            ["Tarta de verduras",    "Tarta integral de espinaca y ricota",           "2026-06-09", "vegetariano",   900, 10, 1],
-            ["Bowl vegano",          "Bowl de quinoa con vegetales asados",           "2026-06-10", "vegano",       1000,  8, 1],
-            ["Pollo al horno",       "Pollo con hierbas, sin TACC, con ensalada",     "2026-06-10", "sin_tacc",     1300, 12, 1],
-            ["Pasta con salsa",      "Tallarines con salsa bolognesa casera",         "2026-06-11", "clasico",       800, 20, 1],
-            ["Ensalada proteica",    "Mix de legumbres, semillas y vegetales frescos","2026-06-11", "vegano",        950,  6, 1],
+            ["Milanesa con pure", "Milanesa de ternera con pure de papas", "2026-06-09", "clasico", 1200, 15, 1, "../assets/milanesa_con_pure.png"],
+            ["Tarta de verduras", "Tarta integral de espinaca y ricota", "2026-06-09", "vegetariano", 900, 10, 1, "../assets/tarta_verduras.jpg"],
+            ["Bowl vegano", "Bowl de quinoa con vegetales asados", "2026-06-10", "vegano", 1000, 8, 1, "../assets/bowl_vegano.jpg"],
+            ["Pollo al horno", "Pollo con hierbas, sin TACC, con ensalada", "2026-06-10", "sin_tacc", 1300, 12, 1, "../assets/pollo_al_horno.jpg"],
+            ["Pasta con salsa", "Tallarines con salsa bolognesa casera", "2026-06-11", "clasico", 800, 20, 1, "../assets/pasta_con_salsa.jpg"],
+            ["Ensalada proteica", "Mix de legumbres, semillas y vegetales frescos", "2026-06-11", "vegano", 950, 6, 1, "../assets/ensalada_proteica.jpg"],
+            ["Curry de garbanzos", "Curry suave de garbanzos, calabaza y arroz", "2026-06-12", "vegano", 1100, 12, 1, "../assets/curry_de_garbanzos.jpg"],
+            ["Lasagna de berenjena", "Capas de berenjena, ricota y salsa de tomate", "2026-06-12", "vegetariano", 1250, 10, 1, "../assets/lasagna_de_berenjena.jpg"],
+            ["Merluza con papas", "Filet de merluza al horno con papas rusticas", "2026-06-12", "sin_tacc", 1450, 10, 1, "../assets/merluza_con_papas.jpg"],
+            ["Bondiola braseada", "Bondiola cocida lentamente con batatas", "2026-06-13", "clasico", 1550, 14, 1, "../assets/bondiola_braseada.jpg"],
+            ["Estofado de Yoda", "Estofado de raices y vegetales inspirado en Dagobah", "2026-06-13", "vegano", 1800, 8, 1, "../assets/estofado_de_yoda.jpg"],
+            ["Desayuno de leche azul", "Avena, frutas y leche azul al estilo Tatooine", "2026-06-13", "vegetariano", 1350, 10, 1, "../assets/desayuno_de_leche_azul.jpg"],
         ];
 
-        for (const [nombre, descripcion, fecha, tipo, precio, cupoDiario, activo] of menus) {
-            const imagenUrl = nombre.startsWith("Milanesa") ? "/assets/mondongo.jpg" : null;
+        for (const [nombre, descripcion, fecha, tipo, precio, cupoDiario, activo, imagenUrl] of menus) {
             await db.run(
                 "INSERT INTO menus (nombre, descripcion, fecha, tipo, precio, cupoDiario, activo, imagenUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [nombre, descripcion, fecha, tipo, precio, cupoDiario, activo, imagenUrl]
             );
         }
 
-        // ── Pedidos ───────────────────────────────────────────────────────────
-        // total = precio * cantidad (calculado acá como lo haría el servicio)
         const pedidos = [
             [1, 2, "2026-06-09", 2, "almuerzo", "Sede central", 2400, "confirmado", null],
-            [1, 2, "2026-06-09", 1, "cena",     "Sede central", 1200, "entregado",  null],
-            [2, 3, "2026-06-09", 3, "almuerzo", "Sede norte",   2700, "pendiente",  null],
-            [2, 3, "2026-06-09", 1, "cena",     "Sede norte",    900, "cancelado",  "Cambió de turno"],
-            [3, 2, "2026-06-10", 2, "almuerzo", "Sede central", 2000, "pendiente",  null],
-            [3, 3, "2026-06-10", 1, "cena",     "Sede sur",     1000, "pendiente",  null],
+            [1, 2, "2026-06-09", 1, "cena", "Sede central", 1200, "entregado", null],
+            [2, 3, "2026-06-09", 3, "almuerzo", "Sede norte", 2700, "pendiente", null],
+            [2, 3, "2026-06-09", 1, "cena", "Sede norte", 900, "cancelado", "Cambio de turno"],
+            [3, 2, "2026-06-10", 2, "almuerzo", "Sede central", 2000, "pendiente", null],
+            [3, 3, "2026-06-10", 1, "cena", "Sede sur", 1000, "pendiente", null],
             [4, 2, "2026-06-10", 2, "almuerzo", "Sede central", 2600, "confirmado", null],
-            [4, 3, "2026-06-10", 1, "almuerzo", "Sede norte",   1300, "confirmado", null],
-            [5, 2, "2026-06-11", 3, "cena",     "Sede central", 2400, "pendiente",  null],
-            [5, 3, "2026-06-11", 2, "almuerzo", "Sede sur",     1600, "pendiente",  null],
-            [6, 2, "2026-06-11", 1, "cena",     "Sede central",  950, "cancelado",  "No podré retirar"],
-            [6, 3, "2026-06-11", 2, "almuerzo", "Sede norte",   1900, "pendiente",  null],
+            [4, 3, "2026-06-10", 1, "almuerzo", "Sede norte", 1300, "confirmado", null],
+            [5, 2, "2026-06-11", 3, "cena", "Sede central", 2400, "pendiente", null],
+            [5, 3, "2026-06-11", 2, "almuerzo", "Sede sur", 1600, "pendiente", null],
+            [6, 2, "2026-06-11", 1, "cena", "Sede central", 950, "cancelado", "No podre retirar"],
+            [6, 3, "2026-06-11", 2, "almuerzo", "Sede norte", 1900, "pendiente", null],
         ];
 
         const ahora = new Date().toISOString();
-
         for (const [menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, estado, observaciones] of pedidos) {
             const { lastID } = await db.run(
                 `INSERT INTO pedidos (menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, estado, observaciones)
@@ -86,9 +85,9 @@ export async function seedDb() {
         }
 
         await db.run("COMMIT");
-    } catch (err) {
+    } catch (error) {
         await db.run("ROLLBACK");
-        throw err;
+        throw error;
     }
 
     console.log("Datos sembrados correctamente.");
