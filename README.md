@@ -56,6 +56,46 @@ sin header `Origin` siguen permitidos.
 
 ---
 
+## Despliegue en Render
+
+Configuracion recomendada del Web Service:
+
+```text
+Build Command: npm install
+Start Command: npm start
+Health Check Path: /api/health
+```
+
+Variables de entorno:
+
+```env
+NODE_ENV=production
+JWT_SECRET=<secreto-largo-y-aleatorio>
+CORS_ORIGIN=https://url-publica-del-frontend
+BUSINESS_TIME_ZONE=America/Argentina/Buenos_Aires
+TRUST_PROXY_HOPS=1
+DB_FILE=/var/data/database.sqlite
+SEED_ON_START=false
+```
+
+- `TRUST_PROXY_HOPS=1` permite que `express-rate-limit` identifique correctamente
+  la IP real detras del proxy de Render.
+- El servidor ejecuta automaticamente `initDb()` antes de escuchar conexiones.
+- `SEED_ON_START=true` carga usuarios y datos demo. No usarlo en produccion real
+  porque crea credenciales conocidas.
+- SQLite necesita un Persistent Disk montado en `/var/data`. Sin disco
+  persistente, Render puede perder toda la base al reiniciar o desplegar.
+- Para escalar a mas de una instancia, migrar SQLite a PostgreSQL.
+
+Healthchecks:
+
+```http
+GET /             # proceso HTTP activo
+GET /api/health   # proceso activo y conexion a base disponible
+```
+
+---
+
 ## 👥 Credenciales del seed
 
 | Rol | Email | Password |

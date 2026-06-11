@@ -1,4 +1,6 @@
 import { getDb } from "./db.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
 export async function initDb() {
     const db = await getDb();
@@ -66,7 +68,7 @@ export async function initDb() {
     console.log("Base de datos inicializada correctamente.");
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replace(/\\/g, "/")}`).href) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
     initDb().catch((error) => {
         console.error("Error inicializando la base:", error);
         process.exitCode = 1;

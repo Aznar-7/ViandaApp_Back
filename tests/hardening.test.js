@@ -36,6 +36,18 @@ afterAll(async () => {
 });
 
 describe("Hardening", () => {
+    it("expone healthchecks para la plataforma", async () => {
+        const [root, health] = await Promise.all([
+            request(app).get("/"),
+            request(app).get("/api/health"),
+        ]);
+
+        expect(root.status).toBe(200);
+        expect(root.body.status).toBe("ok");
+        expect(health.status).toBe(200);
+        expect(health.body).toEqual({ status: "ok", database: "connected" });
+    });
+
     it("permite solo origins configurados por CORS", async () => {
         const [allowed, secondAllowed, denied] = await Promise.all([
             request(app).get("/api/menus").set("Origin", "http://localhost:5173"),

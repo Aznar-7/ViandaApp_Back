@@ -1,4 +1,6 @@
 import bcrypt from "bcryptjs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { getDb } from "./db.js";
 
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS) || 10;
@@ -95,7 +97,7 @@ export async function seedDb() {
     console.log("  Usuario: maria@viandas.com  /  user123");
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replace(/\\/g, "/")}`).href) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
     seedDb().catch((error) => {
         console.error("Error sembrando datos:", error);
         process.exitCode = 1;

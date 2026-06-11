@@ -28,3 +28,9 @@ export const CORS_ORIGINS = parseCorsOrigins(rawCorsOrigins);
 export const BUSINESS_TIME_ZONE = process.env.BUSINESS_TIME_ZONE || "America/Argentina/Buenos_Aires";
 export const JWT_ISSUER = process.env.JWT_ISSUER || "viandas-api";
 export const JWT_AUDIENCE = process.env.JWT_AUDIENCE || "viandas-frontend";
+export const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS ?? (NODE_ENV === "production" ? 1 : 0));
+export const SEED_ON_START = process.env.SEED_ON_START === "true";
+
+if (!Number.isInteger(TRUST_PROXY_HOPS) || TRUST_PROXY_HOPS < 0) {
+    throw new Error("TRUST_PROXY_HOPS debe ser un numero entero mayor o igual a 0");
+}

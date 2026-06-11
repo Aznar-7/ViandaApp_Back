@@ -17,6 +17,15 @@ frontend. Se pueden configurar varios origins separados por coma. Un frontend no
 incluido puede recibir la respuesta HTTP, pero el navegador no le permite leerla
 porque el backend omite `Access-Control-Allow-Origin`.
 
+Healthchecks publicos:
+
+```http
+GET /
+GET /api/health
+```
+
+`GET /api/health` responde `200` solamente cuando la API puede consultar la base.
+
 Todos los endpoints de pedidos requieren:
 
 ```http

@@ -14,6 +14,8 @@ Corregido en esta iteracion:
 - IDs, fechas reales, enteros, filtros y campos desconocidos validados.
 - CORS exige origins explicitos en produccion, valida URLs y soporta multiples
   frontends configurados desde entorno.
+- El servidor inicializa/migra el esquema antes de escuchar, configura
+  `trust proxy` por entorno y expone healthchecks para despliegues.
 - Pedidos entregados consumen cupo y `menuDelDia` excluye cancelados.
 - Fecha de negocio configurable, con default `America/Argentina/Buenos_Aires`.
 - Indices compuestos para consultas principales.
