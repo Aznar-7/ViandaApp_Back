@@ -78,6 +78,7 @@ BUSINESS_TIME_ZONE=America/Argentina/Buenos_Aires
 TRUST_PROXY_HOPS=1
 DB_FILE=/var/data/database.sqlite
 SEED_ON_START=false
+SYNC_MENUS_ON_START=true
 ```
 
 - `TRUST_PROXY_HOPS=1` permite que `express-rate-limit` identifique correctamente
@@ -85,11 +86,14 @@ SEED_ON_START=false
 - El servidor ejecuta automaticamente `initDb()` antes de escuchar conexiones.
 - `SEED_ON_START=true` carga usuarios y datos demo. No usarlo en produccion real
   porque crea credenciales conocidas.
+- `SYNC_MENUS_ON_START=true` actualiza el catalogo seed e inserta menús faltantes
+  automaticamente en cada deploy. Es idempotente y no requiere Render Shell.
 - SQLite necesita un Persistent Disk montado en `/var/data`. Sin disco
   persistente, Render puede perder toda la base al reiniciar o desplegar.
 - Para escalar a mas de una instancia, migrar SQLite a PostgreSQL.
 
-Para incorporar cambios del catalogo seed en una base persistente ya existente:
+La sincronizacion se ejecuta automaticamente al arrancar. También puede ejecutarse
+manualmente cuando exista acceso a una terminal:
 
 ```bash
 npm run sync-menus

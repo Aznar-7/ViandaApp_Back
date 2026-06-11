@@ -117,6 +117,9 @@ Para sincronizar todo el catalogo seed e insertar menús faltantes:
 npm run sync-menus
 ```
 
+En despliegues sin acceso a Shell, configurar `SYNC_MENUS_ON_START=true`. El
+servidor ejecuta la misma sincronizacion automaticamente antes de escuchar.
+
 ### Pedido
 
 ```json

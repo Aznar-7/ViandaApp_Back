@@ -16,6 +16,8 @@ Corregido en esta iteracion:
   frontends configurados desde entorno.
 - El servidor inicializa/migra el esquema antes de escuchar, configura
   `trust proxy` por entorno y expone healthchecks para despliegues.
+- El catalogo seed se sincroniza de forma idempotente al arrancar, evitando
+  depender de acceso Shell en plataformas administradas.
 - Pedidos entregados consumen cupo y `menuDelDia` excluye cancelados.
 - Fecha de negocio configurable, con default `America/Argentina/Buenos_Aires`.
 - Indices compuestos para consultas principales.
