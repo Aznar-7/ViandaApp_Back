@@ -104,7 +104,7 @@ GET /api/health   # proceso activo y conexion a base disponible
 | 🙍 Usuario | juan@viandas.com | user123 |
 | 🙍 Usuario | maria@viandas.com | user123 |
 
-> El seed también carga **12 menús** y **12 pedidos** distribuidos en todos los estados.
+> El seed también carga **12 menús** y **24 pedidos** distribuidos en todos los estados.
 
 ---
 

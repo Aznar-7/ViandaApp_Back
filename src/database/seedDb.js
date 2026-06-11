@@ -67,6 +67,18 @@ export async function seedDb() {
             [5, 3, "2026-06-11", 2, "almuerzo", "Sede sur", 1600, "pendiente", null],
             [6, 2, "2026-06-11", 1, "cena", "Sede central", 950, "cancelado", "No podre retirar"],
             [6, 3, "2026-06-11", 2, "almuerzo", "Sede norte", 1900, "pendiente", null],
+            [7, 2, "2026-06-12", 2, "almuerzo", "Sede central", 2200, "confirmado", "Sin picante"],
+            [7, 3, "2026-06-12", 1, "cena", "Sede sur", 1100, "pendiente", null],
+            [8, 2, "2026-06-12", 1, "cena", "Sede central", 1250, "entregado", null],
+            [8, 3, "2026-06-12", 2, "almuerzo", "Sede norte", 2500, "confirmado", null],
+            [9, 2, "2026-06-12", 2, "almuerzo", "Sede central", 2900, "pendiente", null],
+            [9, 3, "2026-06-12", 1, "cena", "Sede sur", 1450, "cancelado", "Cambio de planes"],
+            [10, 2, "2026-06-13", 3, "cena", "Sede central", 4650, "confirmado", null],
+            [10, 3, "2026-06-13", 2, "almuerzo", "Sede norte", 3100, "pendiente", null],
+            [11, 2, "2026-06-13", 1, "almuerzo", "Sede central", 1800, "entregado", "Que la Fuerza acompane al chef"],
+            [11, 3, "2026-06-13", 2, "cena", "Sede sur", 3600, "confirmado", null],
+            [12, 2, "2026-06-13", 2, "almuerzo", "Sede central", 2700, "pendiente", "Servir bien fria"],
+            [12, 3, "2026-06-13", 1, "cena", "Sede norte", 1350, "cancelado", "Los droides no desayunan"],
         ];
 
         const ahora = new Date().toISOString();
