@@ -18,3 +18,24 @@ export const listarMenus = asyncHandler(async (req, res) => {
     const menus = await menusService.listarMenus({ tipo, fecha, activo });
     res.json(menus);
 });
+
+export const crearMenu = asyncHandler(async (req, res) => {
+    const menu = await menusService.crearMenu(req.body);
+    res.status(201).json(menu);
+});
+
+export const obtenerMenu = asyncHandler(async (req, res) => {
+    res.json(await menusService.obtenerMenu(req.validatedId));
+});
+
+export const editarMenu = asyncHandler(async (req, res) => {
+    res.json(await menusService.editarMenu(req.validatedId, req.body));
+});
+
+export const activarMenu = asyncHandler(async (req, res) => {
+    res.json(await menusService.cambiarActivo(req.validatedId, 1));
+});
+
+export const desactivarMenu = asyncHandler(async (req, res) => {
+    res.json(await menusService.cambiarActivo(req.validatedId, 0));
+});

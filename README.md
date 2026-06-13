@@ -21,7 +21,7 @@ npm install
 npm run init-db   # crea las tablas
 npm run seed      # carga datos de prueba
 npm run sync-menus # actualiza/inserta el catalogo seed sin borrar datos
-npm run sync-sedes # actualiza/inserta las sedes sin borrar datos
+npm run sync-sedes # inserta sedes faltantes sin sobrescribir cambios administrativos
 npm run sync-menu-images # actualiza imagenUrl sin borrar datos existentes
 npm run dev       # 🚀 http://localhost:3000
 ```
@@ -90,8 +90,9 @@ SYNC_SEDES_ON_START=true
   porque crea credenciales conocidas.
 - `SYNC_MENUS_ON_START=true` actualiza el catalogo seed e inserta menús faltantes
   automaticamente en cada deploy. Es idempotente y no requiere Render Shell.
-- `SYNC_SEDES_ON_START=true` actualiza e inserta sedes automaticamente en cada
-  deploy. Es idempotente y no crea usuarios ni pedidos demo.
+- `SYNC_SEDES_ON_START=true` inserta sedes faltantes automaticamente en cada
+  deploy sin sobrescribir cambios administrativos. Es idempotente y no crea
+  usuarios ni pedidos demo.
 - SQLite necesita un Persistent Disk montado en `/var/data`. Sin disco
   persistente, Render puede perder toda la base al reiniciar o desplegar.
 - Para escalar a mas de una instancia, migrar SQLite a PostgreSQL.
@@ -152,8 +153,61 @@ GET /api/health   # proceso activo y conexion a base disponible
 | Método | Ruta | Descripción |
 |---|---|---|
 | `GET` | `/api/menus` | Listar menús con cupo disponible |
+| `POST` | `/api/menus` | Crear menú (solo admin) |
+| `GET` | `/api/menus/:id` | Obtener menú, solo admin |
+| `PUT` | `/api/menus/:id` | Editar menú, solo admin |
+| `PATCH` | `/api/menus/:id/activar` | Activar menú, solo admin |
+| `PATCH` | `/api/menus/:id/desactivar` | Desactivar menú, solo admin |
 
 **Query params:** `tipo` · `fecha` · `activo`
+
+El alta requiere `Authorization: Bearer <token-admin>`:
+
+```json
+{
+  "nombre": "Menu del dia",
+  "descripcion": "Descripcion completa",
+  "fecha": "2030-02-15",
+  "tipo": "clasico",
+  "precio": 2500,
+  "cupoDiario": 30,
+  "activo": 1,
+  "imagenUrl": "/assets/menu.jpg"
+}
+```
+
+---
+
+### Sedes
+
+`GET /api/sedes` es publico. Las operaciones de gestion requieren rol `admin`.
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| `GET` | `/api/sedes` | Listar sedes activas o filtrar con `?activo=0|1` |
+| `GET` | `/api/sedes/:id` | Obtener sede, solo admin |
+| `POST` | `/api/sedes` | Crear sede, solo admin |
+| `PUT` | `/api/sedes/:id` | Editar sede, solo admin |
+| `PATCH` | `/api/sedes/:id/activar` | Activar sede, solo admin |
+| `PATCH` | `/api/sedes/:id/desactivar` | Desactivar sede, solo admin |
+
+No se eliminan sedes fisicamente para preservar pedidos historicos.
+
+---
+
+### Usuarios - solo admin
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| `GET` | `/api/usuarios` | Listar usuarios; filtros `rol` y `activo` |
+| `GET` | `/api/usuarios/:id` | Obtener usuario |
+| `POST` | `/api/usuarios` | Crear usuario con rol y estado inicial |
+| `PUT` | `/api/usuarios/:id` | Editar nombre, email, rol o estado |
+| `PATCH` | `/api/usuarios/:id/activar` | Activar usuario |
+| `PATCH` | `/api/usuarios/:id/desactivar` | Desactivar usuario |
+
+Los roles permitidos son `usuario` y `admin`. Un admin no puede quitarse su
+propio rol ni desactivar su propio usuario.
 
 ---
 
@@ -337,7 +391,7 @@ tests/
 
 - **SQLite local**: no apto para múltiples instancias del servidor en paralelo.
 - **Sin refresh token**: al expirar el JWT (8h) hay que hacer login de nuevo.
-- **Menús sin CRUD**: se gestionan únicamente mediante el seed.
+- **Menús sin borrado físico**: se pueden listar, crear, editar, activar y desactivar.
 - **Tests sobre la DB de desarrollo**: ejecutar el seed antes de correr tests es obligatorio.
 
 ---

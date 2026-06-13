@@ -12,6 +12,7 @@ import authRoutes    from "./routes/auth.routes.js";
 import menusRoutes   from "./routes/menus.routes.js";
 import pedidosRoutes from "./routes/pedidos.routes.js";
 import sedesRoutes   from "./routes/sedes.routes.js";
+import usuariosRoutes from "./routes/usuarios.routes.js";
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use("/api/auth",    authRoutes);
 app.use("/api/menus",   menusRoutes);
 app.use("/api/pedidos", pedidosRoutes);
 app.use("/api/sedes",   sedesRoutes);
+app.use("/api/usuarios", usuariosRoutes);
 
 app.use((req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);

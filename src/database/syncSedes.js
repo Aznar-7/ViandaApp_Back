@@ -6,18 +6,14 @@ import { seedSedes } from "./seedSedes.js";
 export async function syncSedes() {
     const db = await getDb();
     let inserted = 0;
-    let updated = 0;
+    let existingCount = 0;
 
     await withTransaction(async txDb => {
         for (const [nombre, direccion, activo] of seedSedes) {
-            const existing = await txDb.get("SELECT id FROM sedes WHERE nombre = ?", [nombre]);
+            const existingSede = await txDb.get("SELECT id FROM sedes WHERE nombre = ?", [nombre]);
 
-            if (existing) {
-                await txDb.run(
-                    "UPDATE sedes SET direccion = ?, activo = ? WHERE id = ?",
-                    [direccion, activo, existing.id]
-                );
-                updated++;
+            if (existingSede) {
+                existingCount++;
             } else {
                 await txDb.run(
                     "INSERT INTO sedes (nombre, direccion, activo) VALUES (?, ?, ?)",
@@ -28,8 +24,8 @@ export async function syncSedes() {
         }
     });
 
-    console.log(`Sedes sincronizadas. Actualizadas: ${updated}. Insertadas: ${inserted}.`);
-    return { updated, inserted };
+    console.log(`Sedes sincronizadas. Existentes: ${existingCount}. Insertadas: ${inserted}.`);
+    return { existing: existingCount, inserted };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

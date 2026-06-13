@@ -2,7 +2,24 @@ import request from "supertest";
 import app from "../src/app.js";
 import { closeDb, getDb } from "../src/database/db.js";
 
+let adminToken;
+let userToken;
+const createdSedeIds = [];
+
+beforeAll(async () => {
+    const [adminRes, userRes] = await Promise.all([
+        request(app).post("/api/auth/login").send({ email: "admin@viandas.com", password: "admin123" }),
+        request(app).post("/api/auth/login").send({ email: "juan@viandas.com", password: "user123" }),
+    ]);
+    adminToken = adminRes.body.token;
+    userToken = userRes.body.token;
+});
+
 afterAll(async () => {
+    const db = await getDb();
+    for (const id of createdSedeIds) {
+        await db.run("DELETE FROM sedes WHERE id = ?", [id]);
+    }
     await closeDb();
 });
 
@@ -57,5 +74,37 @@ describe("Sedes", () => {
 
         expect(res.status).toBe(400);
         expect(res.body.error).toMatch(/sede de retiro/i);
+    });
+
+    it("permite al admin crear, editar y desactivar una sede", async () => {
+        const crear = await request(app)
+            .post("/api/sedes")
+            .set("Authorization", `Bearer ${adminToken}`)
+            .send({ nombre: "Sede admin test", direccion: "Direccion inicial", activo: 1 });
+
+        expect(crear.status).toBe(201);
+        createdSedeIds.push(crear.body.id);
+
+        const editar = await request(app)
+            .put(`/api/sedes/${crear.body.id}`)
+            .set("Authorization", `Bearer ${adminToken}`)
+            .send({ direccion: "Direccion editada" });
+        expect(editar.status).toBe(200);
+        expect(editar.body.direccion).toBe("Direccion editada");
+
+        const desactivar = await request(app)
+            .patch(`/api/sedes/${crear.body.id}/desactivar`)
+            .set("Authorization", `Bearer ${adminToken}`);
+        expect(desactivar.status).toBe(200);
+        expect(desactivar.body.activo).toBe(0);
+    });
+
+    it("impide que un usuario comun gestione sedes", async () => {
+        const res = await request(app)
+            .post("/api/sedes")
+            .set("Authorization", `Bearer ${userToken}`)
+            .send({ nombre: "Sede prohibida", direccion: "No insertar", activo: 1 });
+
+        expect(res.status).toBe(403);
     });
 });
