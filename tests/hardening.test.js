@@ -105,7 +105,7 @@ describe("Hardening", () => {
                     fecha: "2030-02-30",
                     cantidad: 1.5,
                     turnoEntrega: "almuerzo",
-                    puntoRetiro: "Sede test",
+                    puntoRetiroId: 1,
                     total: 1,
                 }),
         ]);
@@ -134,7 +134,7 @@ describe("Hardening", () => {
             fecha: "2030-01-01",
             cantidad: 1,
             turnoEntrega: "almuerzo",
-            puntoRetiro: "Sede test",
+            puntoRetiroId: 1,
         };
 
         const responses = await Promise.all([

@@ -27,6 +27,13 @@ export async function initDb() {
       imagenUrl TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS sedes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL UNIQUE,
+      direccion TEXT NOT NULL,
+      activo INTEGER NOT NULL DEFAULT 1
+    );
+
     CREATE TABLE IF NOT EXISTS pedidos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       menuId INTEGER NOT NULL,
@@ -34,12 +41,13 @@ export async function initDb() {
       fecha TEXT NOT NULL,
       cantidad INTEGER NOT NULL,
       turnoEntrega TEXT NOT NULL CHECK (turnoEntrega IN ('almuerzo', 'cena')),
-      puntoRetiro TEXT NOT NULL,
+      puntoRetiroId INTEGER NOT NULL,
       total REAL NOT NULL,
       estado TEXT NOT NULL CHECK (estado IN ('pendiente', 'confirmado', 'cancelado', 'entregado')),
       observaciones TEXT,
       FOREIGN KEY (menuId) REFERENCES menus(id),
-      FOREIGN KEY (usuarioId) REFERENCES usuarios(id)
+      FOREIGN KEY (usuarioId) REFERENCES usuarios(id),
+      FOREIGN KEY (puntoRetiroId) REFERENCES sedes(id)
     );
 
     CREATE TABLE IF NOT EXISTS historial_pedidos (
@@ -62,6 +70,7 @@ export async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_pedidos_menuId    ON pedidos(menuId);
     CREATE INDEX IF NOT EXISTS idx_pedidos_menu_fecha_estado ON pedidos(menuId, fecha, estado);
     CREATE INDEX IF NOT EXISTS idx_pedidos_usuario_fecha ON pedidos(usuarioId, fecha DESC);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_puntoRetiroId ON pedidos(puntoRetiroId);
     CREATE INDEX IF NOT EXISTS idx_historial_pedido_fecha ON historial_pedidos(pedidoId, fechaHora);
   `);
 

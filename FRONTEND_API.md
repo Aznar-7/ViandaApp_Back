@@ -130,12 +130,14 @@ servidor ejecuta la misma sincronizacion automaticamente antes de escuchar.
   "fecha": "2026-06-10",
   "cantidad": 2,
   "turnoEntrega": "almuerzo",
-  "puntoRetiro": "Sede central",
+  "puntoRetiroId": 1,
   "total": 2000,
   "estado": "pendiente",
   "observaciones": null,
   "menuNombre": "Bowl vegano",
-  "usuarioNombre": "Juan Perez"
+  "usuarioNombre": "Juan Perez",
+  "puntoRetiroNombre": "Estrella de la Muerte",
+  "puntoRetiroDireccion": "Sector 001, Galaxia"
 }
 ```
 
@@ -267,6 +269,28 @@ Response `200`:
 `cupoDisponible` descuenta pedidos `pendiente`, `confirmado` y `entregado`.
 Las imagenes se sirven con cache HTTP por 1 dia y permiten carga cross-origin.
 
+## Sedes
+
+### Listar sedes
+
+`GET /api/sedes`
+
+Ruta publica. Devuelve directamente un array de sedes, ordenado por nombre.
+Por defecto devuelve solo sedes activas. Acepta `?activo=0|1`.
+
+```json
+[
+  {
+    "id": 1,
+    "nombre": "Estrella de la Muerte",
+    "direccion": "Sector 001, Galaxia",
+    "activo": 1
+  }
+]
+```
+
+El `id` seleccionado se envia como `puntoRetiroId` al crear o editar un pedido.
+
 ## Pedidos
 
 Todas las rutas de esta seccion requieren JWT.
@@ -308,12 +332,14 @@ Response `200`:
       "fecha": "2026-06-10",
       "cantidad": 2,
       "turnoEntrega": "almuerzo",
-      "puntoRetiro": "Sede central",
+      "puntoRetiroId": 1,
       "total": 2000,
       "estado": "pendiente",
       "observaciones": null,
       "menuNombre": "Bowl vegano",
-      "usuarioNombre": "Juan Perez"
+      "usuarioNombre": "Juan Perez",
+      "puntoRetiroNombre": "Estrella de la Muerte",
+      "puntoRetiroDireccion": "Sector 001, Galaxia"
     }
   ],
   "total": 1,
@@ -349,7 +375,7 @@ Body:
   "fecha": "2026-06-10",
   "cantidad": 2,
   "turnoEntrega": "almuerzo",
-  "puntoRetiro": "Sede central",
+  "puntoRetiroId": 1,
   "observaciones": "Sin cubiertos"
 }
 ```
@@ -360,12 +386,13 @@ Validaciones:
 - `fecha`: string obligatorio que represente una fecha real con formato `YYYY-MM-DD`.
 - `cantidad`: number entero obligatorio, minimo `1`.
 - `turnoEntrega`: obligatorio, `almuerzo` o `cena`.
-- `puntoRetiro`: string obligatorio, entre 2 y 200 caracteres.
+- `puntoRetiroId`: number entero obligatorio, minimo `1`.
 - `observaciones`: string opcional, maximo 500 caracteres.
 
 Reglas:
 
 - El menu debe existir, estar activo y corresponder exactamente a `fecha`.
+- La sede de retiro debe existir y estar activa.
 - Debe existir cupo suficiente.
 - El backend asigna el usuario autenticado.
 - El backend calcula `total = precio * cantidad`.
@@ -377,7 +404,7 @@ Response `201`: el `Pedido` creado.
 Errores relevantes:
 
 - `404`: `Menu no encontrado`.
-- `400`: menu inactivo, fecha incorrecta o cupo insuficiente.
+- `400`: menu inactivo, fecha incorrecta, sede inexistente/inactiva o cupo insuficiente.
 
 ### Editar pedido
 
@@ -389,7 +416,7 @@ Body: enviar al menos uno de estos campos.
 {
   "cantidad": 3,
   "turnoEntrega": "cena",
-  "puntoRetiro": "Sede norte",
+  "puntoRetiroId": 2,
   "observaciones": "Retira otra persona"
 }
 ```
@@ -460,13 +487,13 @@ Response `200`:
     "valorAnterior": {
       "cantidad": 2,
       "turnoEntrega": "almuerzo",
-      "puntoRetiro": "Sede central",
+      "puntoRetiroId": 1,
       "total": 2000
     },
     "valorNuevo": {
       "cantidad": 3,
       "turnoEntrega": "cena",
-      "puntoRetiro": "Sede norte",
+      "puntoRetiroId": 2,
       "total": 3000
     },
     "usuarioNombre": "Juan Perez"
@@ -543,9 +570,10 @@ Los pedidos `pendiente`, `confirmado` y `entregado` consumen cupo. Los pedidos `
 ### Crear pedido
 
 1. Consultar menus activos por fecha con `GET /api/menus?fecha=YYYY-MM-DD`.
-2. Deshabilitar menus con `cupoDisponible < 1`.
-3. Enviar el pedido sin `total`, `estado` ni `usuarioId`.
-4. Usar el pedido devuelto por el `201` como fuente final de datos.
+2. Consultar sedes activas con `GET /api/sedes` y enviar el `id` elegido como `puntoRetiroId`.
+3. Deshabilitar menus con `cupoDisponible < 1`.
+4. Enviar el pedido sin `total`, `estado` ni `usuarioId`.
+5. Usar el pedido devuelto por el `201` como fuente final de datos.
 
 ### Gestion de usuario
 

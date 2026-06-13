@@ -41,9 +41,9 @@ export const obtenerPedido = asyncHandler(async (req, res) => {
 });
 
 export const crearPedido = asyncHandler(async (req, res) => {
-    const { menuId, fecha, cantidad, turnoEntrega, puntoRetiro, observaciones } = req.body;
+    const { menuId, fecha, cantidad, turnoEntrega, puntoRetiroId, observaciones } = req.body;
     const pedido = await pedidosService.crearPedido({
-        menuId, usuarioId: req.user.id, fecha, cantidad, turnoEntrega, puntoRetiro, observaciones,
+        menuId, usuarioId: req.user.id, fecha, cantidad, turnoEntrega, puntoRetiroId, observaciones,
     });
     res.status(201).json(pedido);
 });

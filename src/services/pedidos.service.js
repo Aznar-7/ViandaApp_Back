@@ -3,12 +3,20 @@ import { ORDENES_PEDIDO } from "../domain/constants.js";
 import { AppError } from "../utils/AppErrors.js";
 import { getBusinessDate } from "../utils/date.js";
 
+const PEDIDO_SELECT = `
+    p.id, p.menuId, p.usuarioId, p.fecha, p.cantidad, p.turnoEntrega,
+    p.puntoRetiroId, p.total, p.estado, p.observaciones,
+    m.nombre AS menuNombre, u.nombre AS usuarioNombre,
+    s.nombre AS puntoRetiroNombre, s.direccion AS puntoRetiroDireccion
+`;
+
 async function fetchPedidoById(db, id) {
     const pedido = await db.get(
-        `SELECT p.*, m.nombre AS menuNombre, u.nombre AS usuarioNombre
+        `SELECT ${PEDIDO_SELECT}
          FROM pedidos p
          JOIN menus m ON m.id = p.menuId
          JOIN usuarios u ON u.id = p.usuarioId
+         LEFT JOIN sedes s ON s.id = p.puntoRetiroId
          WHERE p.id = ?`,
         [id]
     );
@@ -69,10 +77,11 @@ export async function listarPedidos({ usuarioId, rol, estado, fecha, page = 1, l
 
     const [pedidos, conteo] = await Promise.all([
         db.all(
-            `SELECT p.*, m.nombre AS menuNombre, u.nombre AS usuarioNombre
+            `SELECT ${PEDIDO_SELECT}
              FROM pedidos p
              JOIN menus m ON m.id = p.menuId
              JOIN usuarios u ON u.id = p.usuarioId
+             LEFT JOIN sedes s ON s.id = p.puntoRetiroId
              ${where}
              ORDER BY p.${col} DESC
              LIMIT ? OFFSET ?`,
@@ -93,12 +102,15 @@ export async function obtenerPedido(id, usuarioId, rol) {
     return pedido;
 }
 
-export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, observaciones }) {
+export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiroId, observaciones }) {
     return withTransaction(async (txDb) => {
         const menu = await txDb.get("SELECT * FROM menus WHERE id = ?", [menuId]);
         if (!menu) throw AppError("Menu no encontrado", 404);
         if (!menu.activo) throw AppError("El menu no esta activo", 400);
         if (menu.fecha !== fecha) throw AppError("El menu no esta disponible para esa fecha", 400);
+
+        const sede = await txDb.get("SELECT id FROM sedes WHERE id = ? AND activo = 1", [puntoRetiroId]);
+        if (!sede) throw AppError("Sede de retiro no encontrada o inactiva", 400);
 
         const cupoDisponible = await calcularCupoDisponible(txDb, menuId, fecha);
         if (cantidad > cupoDisponible) {
@@ -107,9 +119,9 @@ export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEnt
 
         const total = menu.precio * cantidad;
         const { lastID } = await txDb.run(
-            `INSERT INTO pedidos (menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, estado, observaciones)
+            `INSERT INTO pedidos (menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiroId, total, estado, observaciones)
              VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente', ?)`,
-            [menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiro, total, observaciones ?? null]
+            [menuId, usuarioId, fecha, cantidad, turnoEntrega, puntoRetiroId, total, observaciones ?? null]
         );
 
         await registrarHistorial(txDb, {
@@ -123,8 +135,8 @@ export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEnt
     });
 }
 
-export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega, puntoRetiro, observaciones }) {
-    if ([cantidad, turnoEntrega, puntoRetiro, observaciones].every(value => value === undefined)) {
+export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega, puntoRetiroId, observaciones }) {
+    if ([cantidad, turnoEntrega, puntoRetiroId, observaciones].every(value => value === undefined)) {
         throw AppError("Debes enviar al menos un campo para editar", 400);
     }
 
@@ -136,6 +148,11 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
         }
         if (!["pendiente", "confirmado"].includes(pedido.estado)) {
             throw AppError("Solo se pueden editar pedidos pendientes o confirmados", 400);
+        }
+
+        if (puntoRetiroId !== undefined) {
+            const sede = await txDb.get("SELECT id FROM sedes WHERE id = ? AND activo = 1", [puntoRetiroId]);
+            if (!sede) throw AppError("Sede de retiro no encontrada o inactiva", 400);
         }
 
         const nuevaCantidad = cantidad ?? pedido.cantidad;
@@ -151,19 +168,19 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
         const valorAnterior = {
             cantidad: pedido.cantidad,
             turnoEntrega: pedido.turnoEntrega,
-            puntoRetiro: pedido.puntoRetiro,
+            puntoRetiroId: pedido.puntoRetiroId,
             total: pedido.total,
             observaciones: pedido.observaciones,
         };
 
         const result = await txDb.run(
             `UPDATE pedidos
-             SET cantidad = ?, turnoEntrega = ?, puntoRetiro = ?, total = ?, observaciones = ?
+             SET cantidad = ?, turnoEntrega = ?, puntoRetiroId = ?, total = ?, observaciones = ?
              WHERE id = ? AND estado = ?`,
             [
                 nuevaCantidad,
                 turnoEntrega ?? pedido.turnoEntrega,
-                puntoRetiro ?? pedido.puntoRetiro,
+                puntoRetiroId ?? pedido.puntoRetiroId,
                 nuevoTotal,
                 observaciones ?? pedido.observaciones,
                 id,
@@ -182,7 +199,7 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
             valorNuevo: {
                 cantidad: nuevaCantidad,
                 turnoEntrega: turnoEntrega ?? pedido.turnoEntrega,
-                puntoRetiro: puntoRetiro ?? pedido.puntoRetiro,
+                puntoRetiroId: puntoRetiroId ?? pedido.puntoRetiroId,
                 total: nuevoTotal,
                 observaciones: observaciones ?? pedido.observaciones,
             },

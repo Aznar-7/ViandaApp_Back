@@ -19,7 +19,7 @@ beforeAll(async () => {
     const db = await getDb();
 
     // Auto-cleanup: elimina pedidos de test de runs anteriores que crashearon antes de afterAll
-    const leftovers = await db.all("SELECT id FROM pedidos WHERE puntoRetiro = 'Sede test'");
+    const leftovers = await db.all("SELECT id FROM pedidos WHERE observaciones = 'pedido-test'");
     for (const { id } of leftovers) {
         await db.run("DELETE FROM historial_pedidos WHERE pedidoId = ?", [id]);
         await db.run("DELETE FROM pedidos WHERE id = ?", [id]);
@@ -34,7 +34,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
     const db = await getDb();
-    const testPedidos = await db.all("SELECT id FROM pedidos WHERE puntoRetiro = 'Sede test'");
+    const testPedidos = await db.all("SELECT id FROM pedidos WHERE observaciones = 'pedido-test'");
     for (const { id } of testPedidos) {
         await db.run("DELETE FROM historial_pedidos WHERE pedidoId = ?", [id]);
         await db.run("DELETE FROM pedidos WHERE id = ?", [id]);
@@ -64,6 +64,8 @@ describe("Pedidos", () => {
         expect(res.status).toBe(200);
         expect(res.body.id).toBe(pedidoExistente.id);
         expect(res.body.menuNombre).toBeDefined();
+        expect(res.body.puntoRetiroNombre).toBeDefined();
+        expect(res.body.puntoRetiroDireccion).toBeDefined();
     });
 
     // Test 5
@@ -85,7 +87,8 @@ describe("Pedidos", () => {
                 fecha:        "2026-06-11",
                 cantidad:     1,
                 turnoEntrega: "almuerzo",
-                puntoRetiro:  "Sede test",
+                puntoRetiroId: 1,
+                observaciones: "pedido-test",
             });
 
         expect(res.status).toBe(201);
@@ -103,7 +106,7 @@ describe("Pedidos", () => {
                 fecha:        "2026-06-11",
                 cantidad:     0,
                 turnoEntrega: "almuerzo",
-                puntoRetiro:  "Sede test",
+                puntoRetiroId: 1,
             });
 
         expect(res.status).toBe(400);
@@ -119,7 +122,7 @@ describe("Pedidos", () => {
                 fecha:        "2026-06-11",
                 cantidad:     100,
                 turnoEntrega: "almuerzo",
-                puntoRetiro:  "Sede test",
+                puntoRetiroId: 1,
             });
 
         expect(res.status).toBe(400);

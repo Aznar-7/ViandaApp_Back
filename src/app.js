@@ -11,6 +11,7 @@ import { asyncHandler } from "./utils/asyncHandler.js";
 import authRoutes    from "./routes/auth.routes.js";
 import menusRoutes   from "./routes/menus.routes.js";
 import pedidosRoutes from "./routes/pedidos.routes.js";
+import sedesRoutes   from "./routes/sedes.routes.js";
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.get("/api/health", asyncHandler(async (req, res) => {
 app.use("/api/auth",    authRoutes);
 app.use("/api/menus",   menusRoutes);
 app.use("/api/pedidos", pedidosRoutes);
+app.use("/api/sedes",   sedesRoutes);
 
 app.use((req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);
