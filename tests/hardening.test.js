@@ -116,16 +116,22 @@ describe("Hardening", () => {
     });
 
     it("rechaza filtros invalidos", async () => {
-        const res = await request(app).get("/api/menus?activo=2&fecha=2026-02-30");
+        const [menus, menuId, tipo, sortBy, order] = await Promise.all([
+            request(app).get("/api/menus?activo=2&fecha=2026-02-30"),
+            request(app).get("/api/pedidos?menuId=no-es-id").set("Authorization", `Bearer ${adminToken}`),
+            request(app).get("/api/pedidos?tipo=otro").set("Authorization", `Bearer ${adminToken}`),
+            request(app).get("/api/pedidos?sortBy=otro").set("Authorization", `Bearer ${adminToken}`),
+            request(app).get("/api/pedidos?order=sideways").set("Authorization", `Bearer ${adminToken}`),
+        ]);
 
-        expect(res.status).toBe(400);
+        expect([menus, menuId, tipo, sortBy, order].every(res => res.status === 400)).toBe(true);
     });
 
-    it("considera pedidos entregados al calcular cupo utilizado", async () => {
+    it("libera el cupo de pedidos entregados segun la regla del dominio", async () => {
         const res = await request(app).get("/api/menus?fecha=2026-06-09&tipo=clasico");
 
         expect(res.status).toBe(200);
-        expect(res.body[0].cupoDisponible).toBe(12);
+        expect(res.body[0].cupoDisponible).toBe(13);
     });
 
     it("serializa altas concurrentes y no supera el cupo", async () => {

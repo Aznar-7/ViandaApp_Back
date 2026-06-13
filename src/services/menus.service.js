@@ -6,7 +6,7 @@ async function fetchMenuById(db, id) {
         `SELECT
             m.*,
             m.cupoDiario - COALESCE(SUM(
-                CASE WHEN p.estado IN ('pendiente', 'confirmado', 'entregado') THEN p.cantidad ELSE 0 END
+                CASE WHEN p.estado IN ('pendiente', 'confirmado') THEN p.cantidad ELSE 0 END
             ), 0) AS cupoDisponible
          FROM menus m
          LEFT JOIN pedidos p ON p.menuId = m.id AND p.fecha = m.fecha
@@ -38,7 +38,7 @@ export async function listarMenus({ tipo, fecha, activo = 1 } = {}) {
         SELECT
             m.*,
             m.cupoDiario - COALESCE(SUM(
-                CASE WHEN p.estado IN ('pendiente', 'confirmado', 'entregado') THEN p.cantidad ELSE 0 END
+                CASE WHEN p.estado IN ('pendiente', 'confirmado') THEN p.cantidad ELSE 0 END
             ), 0) AS cupoDisponible
         FROM menus m
         LEFT JOIN pedidos p ON p.menuId = m.id AND p.fecha = m.fecha
@@ -101,7 +101,7 @@ export async function editarMenu(id, cambios) {
     const { reservado } = await db.get(
         `SELECT COALESCE(SUM(cantidad), 0) AS reservado
          FROM pedidos
-         WHERE menuId = ? AND fecha = ? AND estado IN ('pendiente', 'confirmado', 'entregado')`,
+         WHERE menuId = ? AND fecha = ? AND estado IN ('pendiente', 'confirmado')`,
         [id, fecha]
     );
     if (cupoDiario < reservado) {

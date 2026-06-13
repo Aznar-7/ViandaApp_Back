@@ -42,7 +42,7 @@ async function registrarHistorial(db, { pedidoId, usuarioId, accion, valorAnteri
 async function calcularCupoDisponible(db, menuId, fecha, excluirPedidoId = -1) {
     const row = await db.get(
         `SELECT m.cupoDiario - COALESCE(SUM(
-             CASE WHEN p.estado IN ('pendiente', 'confirmado', 'entregado') THEN p.cantidad ELSE 0 END
+             CASE WHEN p.estado IN ('pendiente', 'confirmado') THEN p.cantidad ELSE 0 END
          ), 0) AS cupoDisponible
          FROM menus m
          LEFT JOIN pedidos p ON p.menuId = m.id AND p.fecha = ? AND p.id != ?
@@ -53,7 +53,18 @@ async function calcularCupoDisponible(db, menuId, fecha, excluirPedidoId = -1) {
     return row?.cupoDisponible ?? 0;
 }
 
-export async function listarPedidos({ usuarioId, rol, estado, fecha, page = 1, limit = 10, order = "fecha" }) {
+export async function listarPedidos({
+    usuarioId,
+    rol,
+    estado,
+    fecha,
+    menuId,
+    tipo,
+    page = 1,
+    limit = 10,
+    sortBy = "fecha",
+    order = "desc",
+}) {
     const db = await getDb();
     const condiciones = [];
     const params = [];
@@ -70,9 +81,18 @@ export async function listarPedidos({ usuarioId, rol, estado, fecha, page = 1, l
         condiciones.push("p.fecha = ?");
         params.push(fecha);
     }
+    if (menuId) {
+        condiciones.push("p.menuId = ?");
+        params.push(menuId);
+    }
+    if (tipo) {
+        condiciones.push("m.tipo = ?");
+        params.push(tipo);
+    }
 
     const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
-    const col = ORDENES_PEDIDO.includes(order) ? order : "fecha";
+    const col = ORDENES_PEDIDO.includes(sortBy) ? sortBy : "fecha";
+    const direction = order === "asc" ? "ASC" : "DESC";
     const offset = (page - 1) * limit;
 
     const [pedidos, conteo] = await Promise.all([
@@ -83,14 +103,20 @@ export async function listarPedidos({ usuarioId, rol, estado, fecha, page = 1, l
              JOIN usuarios u ON u.id = p.usuarioId
              LEFT JOIN sedes s ON s.id = p.puntoRetiroId
              ${where}
-             ORDER BY p.${col} DESC
+             ORDER BY p.${col} ${direction}, p.id ${direction}
              LIMIT ? OFFSET ?`,
             [...params, limit, offset]
         ),
-        db.get(`SELECT COUNT(*) AS total FROM pedidos p ${where}`, params),
+        db.get(
+            `SELECT COUNT(*) AS total
+             FROM pedidos p
+             JOIN menus m ON m.id = p.menuId
+             ${where}`,
+            params
+        ),
     ]);
 
-    return { pedidos, total: conteo.total, page, limit };
+    return { pedidos, total: conteo.total, page, limit, sortBy: col, order };
 }
 
 export async function obtenerPedido(id, usuarioId, rol) {
@@ -135,8 +161,8 @@ export async function crearPedido({ menuId, usuarioId, fecha, cantidad, turnoEnt
     });
 }
 
-export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega, puntoRetiroId, observaciones }) {
-    if ([cantidad, turnoEntrega, puntoRetiroId, observaciones].every(value => value === undefined)) {
+export async function editarPedido(id, usuarioId, rol, { menuId, cantidad, turnoEntrega, puntoRetiroId, observaciones }) {
+    if ([menuId, cantidad, turnoEntrega, puntoRetiroId, observaciones].every(value => value === undefined)) {
         throw AppError("Debes enviar al menos un campo para editar", 400);
     }
 
@@ -155,17 +181,23 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
             if (!sede) throw AppError("Sede de retiro no encontrada o inactiva", 400);
         }
 
+        const nuevoMenuId = menuId ?? pedido.menuId;
+        const menu = await txDb.get("SELECT * FROM menus WHERE id = ?", [nuevoMenuId]);
+        if (!menu) throw AppError("Menu no encontrado", 404);
+        if (!menu.activo) throw AppError("El menu no esta activo", 400);
+        if (menu.fecha !== pedido.fecha) throw AppError("El menu no esta disponible para esa fecha", 400);
+
         const nuevaCantidad = cantidad ?? pedido.cantidad;
-        if (cantidad !== undefined && cantidad !== pedido.cantidad) {
-            const cupoDisponible = await calcularCupoDisponible(txDb, pedido.menuId, pedido.fecha, id);
+        if (nuevoMenuId !== pedido.menuId || nuevaCantidad !== pedido.cantidad) {
+            const cupoDisponible = await calcularCupoDisponible(txDb, nuevoMenuId, pedido.fecha, id);
             if (nuevaCantidad > cupoDisponible) {
                 throw AppError(`Cupo insuficiente. Disponible: ${cupoDisponible}`, 400);
             }
         }
 
-        const menu = await txDb.get("SELECT precio FROM menus WHERE id = ?", [pedido.menuId]);
         const nuevoTotal = menu.precio * nuevaCantidad;
         const valorAnterior = {
+            menuId: pedido.menuId,
             cantidad: pedido.cantidad,
             turnoEntrega: pedido.turnoEntrega,
             puntoRetiroId: pedido.puntoRetiroId,
@@ -175,9 +207,10 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
 
         const result = await txDb.run(
             `UPDATE pedidos
-             SET cantidad = ?, turnoEntrega = ?, puntoRetiroId = ?, total = ?, observaciones = ?
+             SET menuId = ?, cantidad = ?, turnoEntrega = ?, puntoRetiroId = ?, total = ?, observaciones = ?
              WHERE id = ? AND estado = ?`,
             [
+                nuevoMenuId,
                 nuevaCantidad,
                 turnoEntrega ?? pedido.turnoEntrega,
                 puntoRetiroId ?? pedido.puntoRetiroId,
@@ -197,6 +230,7 @@ export async function editarPedido(id, usuarioId, rol, { cantidad, turnoEntrega,
             accion: "edicion",
             valorAnterior,
             valorNuevo: {
+                menuId: nuevoMenuId,
                 cantidad: nuevaCantidad,
                 turnoEntrega: turnoEntrega ?? pedido.turnoEntrega,
                 puntoRetiroId: puntoRetiroId ?? pedido.puntoRetiroId,
@@ -254,10 +288,63 @@ export async function obtenerResumen() {
     const db = await getDb();
     const hoy = getBusinessDate();
 
-    const [porEstado, recaudado, menuDelDia] = await Promise.all([
+    const [
+        porEstado,
+        pedidosPorFecha,
+        pedidosPendientesPorFecha,
+        cuposRestantesPorMenu,
+        importeEstimadoConfirmados,
+        pedidosPendientesEntrega,
+        recaudado,
+        menuDelDia,
+    ] = await Promise.all([
         db.all(
             `SELECT estado, COUNT(*) AS cantidad, SUM(total) AS totalMonto
              FROM pedidos GROUP BY estado`
+        ),
+        db.all(
+            `SELECT fecha, COUNT(*) AS cantidadPedidos, SUM(cantidad) AS cantidadViandas
+             FROM pedidos
+             WHERE estado != 'cancelado'
+             GROUP BY fecha
+             ORDER BY fecha ASC`
+        ),
+        db.all(
+            `SELECT fecha, COUNT(*) AS cantidadPedidos, SUM(cantidad) AS cantidadViandas
+             FROM pedidos
+             WHERE estado = 'pendiente'
+             GROUP BY fecha
+             ORDER BY fecha ASC`
+        ),
+        db.all(
+            `SELECT
+                m.id AS menuId,
+                m.nombre AS menuNombre,
+                m.fecha,
+                m.cupoDiario,
+                COALESCE(SUM(
+                    CASE WHEN p.estado IN ('pendiente', 'confirmado') THEN p.cantidad ELSE 0 END
+                ), 0) AS cupoReservado,
+                m.cupoDiario - COALESCE(SUM(
+                    CASE WHEN p.estado IN ('pendiente', 'confirmado') THEN p.cantidad ELSE 0 END
+                ), 0) AS cupoDisponible
+             FROM menus m
+             LEFT JOIN pedidos p ON p.menuId = m.id AND p.fecha = m.fecha
+             GROUP BY m.id
+             ORDER BY m.fecha ASC, m.nombre ASC`
+        ),
+        db.get(
+            `SELECT COALESCE(SUM(total), 0) AS total
+             FROM pedidos WHERE estado = 'confirmado'`
+        ),
+        db.all(
+            `SELECT ${PEDIDO_SELECT}
+             FROM pedidos p
+             JOIN menus m ON m.id = p.menuId
+             JOIN usuarios u ON u.id = p.usuarioId
+             LEFT JOIN sedes s ON s.id = p.puntoRetiroId
+             WHERE p.estado = 'confirmado'
+             ORDER BY p.fecha ASC, p.id ASC`
         ),
         db.get(
             `SELECT COALESCE(SUM(total), 0) AS total
@@ -275,7 +362,16 @@ export async function obtenerResumen() {
         ),
     ]);
 
-    return { porEstado, recaudado: recaudado.total, menuDelDia };
+    return {
+        porEstado,
+        pedidosPorFecha,
+        pedidosPendientesPorFecha,
+        cuposRestantesPorMenu,
+        importeEstimadoConfirmados: importeEstimadoConfirmados.total,
+        pedidosPendientesEntrega,
+        recaudado: recaudado.total,
+        menuDelDia,
+    };
 }
 
 export async function obtenerHistorial(pedidoId, usuarioId, rol) {

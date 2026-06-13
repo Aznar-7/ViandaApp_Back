@@ -1,16 +1,35 @@
 import * as pedidosService from "../services/pedidos.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { ESTADOS_PEDIDO, ORDENES_PEDIDO } from "../domain/constants.js";
+import { DIRECCIONES_ORDEN, ESTADOS_PEDIDO, ORDENES_PEDIDO, TIPOS_MENU } from "../domain/constants.js";
 import { isValidDateString } from "../utils/date.js";
 
 export const listarPedidos = asyncHandler(async (req, res) => {
-    const { estado, fecha, order } = req.query;
+    const { estado, fecha, tipo } = req.query;
+    const menuId = req.query.menuId === undefined ? undefined : Number(req.query.menuId);
+    let { sortBy, order } = req.query;
 
-    if (order && !ORDENES_PEDIDO.includes(order)) {
-        return res.status(400).json({ error: `"order" debe ser: ${ORDENES_PEDIDO.join(", ")}` });
+    // Compatibilidad con el contrato anterior: ?order=fecha equivale a ?sortBy=fecha&order=desc.
+    if (!sortBy && ORDENES_PEDIDO.includes(order)) {
+        sortBy = order;
+        order = "desc";
+    }
+    sortBy ??= "fecha";
+    order ??= "desc";
+
+    if (!ORDENES_PEDIDO.includes(sortBy)) {
+        return res.status(400).json({ error: `"sortBy" debe ser: ${ORDENES_PEDIDO.join(", ")}` });
+    }
+    if (!DIRECCIONES_ORDEN.includes(order)) {
+        return res.status(400).json({ error: `"order" debe ser: ${DIRECCIONES_ORDEN.join(", ")}` });
     }
     if (estado && !ESTADOS_PEDIDO.includes(estado)) {
         return res.status(400).json({ error: `"estado" debe ser: ${ESTADOS_PEDIDO.join(", ")}` });
+    }
+    if (tipo && !TIPOS_MENU.includes(tipo)) {
+        return res.status(400).json({ error: `"tipo" debe ser: ${TIPOS_MENU.join(", ")}` });
+    }
+    if (menuId !== undefined && (!Number.isInteger(menuId) || menuId < 1)) {
+        return res.status(400).json({ error: "\"menuId\" debe ser un numero entero positivo" });
     }
     if (fecha && !isValidDateString(fecha)) {
         return res.status(400).json({ error: "\"fecha\" debe ser una fecha valida con formato YYYY-MM-DD" });
@@ -28,7 +47,7 @@ export const listarPedidos = asyncHandler(async (req, res) => {
     const result = await pedidosService.listarPedidos({
         usuarioId: req.user.id,
         rol:       req.user.rol,
-        estado, fecha, page, limit, order,
+        estado, fecha, menuId, tipo, page, limit, sortBy, order,
     });
     res.json(result);
 });

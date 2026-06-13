@@ -10,6 +10,7 @@ export const crearPedidoSchema = {
 };
 
 export const editarPedidoSchema = {
+    menuId:        { required: false, type: "number", integer: true, min: 1 },
     cantidad:      { required: false, type: "number", integer: true, min: 1 },
     turnoEntrega:  { required: false, type: "string", enum: TURNOS_ENTREGA },
     puntoRetiroId: { required: false, type: "number", integer: true, min: 1 },

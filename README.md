@@ -20,6 +20,8 @@ diarios, autenticacion JWT y permisos por rol.
 - [Reglas de negocio](#reglas-de-negocio)
 - [Tests](#tests)
 - [Despliegue en Render](#despliegue-en-render)
+- [Decisiones tecnicas](#decisiones-tecnicas)
+- [Limitaciones conocidas](#limitaciones-conocidas)
 - [Estructura del proyecto](#estructura-del-proyecto)
 
 ## Caracteristicas
@@ -381,7 +383,7 @@ desactivar su propio usuario.
 | `GET` | `/api/pedidos/:id` | Autenticado | Obtiene un pedido permitido |
 | `GET` | `/api/pedidos/:id/historial` | Autenticado | Obtiene historial permitido |
 | `POST` | `/api/pedidos` | Autenticado | Crea un pedido |
-| `PUT` | `/api/pedidos/:id` | Autenticado | Edita un pedido permitido |
+| `PUT` | `/api/pedidos/:id` | Autenticado | Edita menu, cantidad, turno, sede u observaciones |
 | `PATCH` | `/api/pedidos/:id/cancelar` | Autenticado | Cancela un pedido permitido |
 | `PATCH` | `/api/pedidos/:id/confirmar` | Admin | Confirma un pedido |
 | `PATCH` | `/api/pedidos/:id/entregar` | Admin | Marca un pedido como entregado |
@@ -392,16 +394,27 @@ Filtros de listado:
 |---|---|---|
 | `estado` | `pendiente`, `confirmado`, `cancelado`, `entregado` | Todos |
 | `fecha` | Fecha real `YYYY-MM-DD` | Todas |
+| `menuId` | ID entero positivo de menu | Todos |
+| `tipo` | `clasico`, `vegetariano`, `vegano`, `sin_tacc` | Todos |
 | `page` | Entero desde `1` | `1` |
 | `limit` | Entero entre `1` y `100` | `10` |
-| `order` | `fecha`, `estado`, `total` | `fecha` |
+| `sortBy` | `fecha`, `estado`, `total` | `fecha` |
+| `order` | `asc`, `desc` | `desc` |
+
+Los filtros son combinables. Por compatibilidad, el formato anterior
+`?order=fecha` sigue funcionando y equivale a `?sortBy=fecha&order=desc`.
+
+El resumen administrativo incluye pedidos por estado y fecha, pedidos pendientes
+por fecha, cupos restantes por menu, importe estimado confirmado y pedidos
+confirmados pendientes de entrega. Tambien conserva metricas adicionales como
+recaudacion y menu mas pedido del dia.
 
 ## Reglas de negocio
 
 ### Cupos
 
-Los pedidos `pendiente`, `confirmado` y `entregado` consumen cupo. Los pedidos
-`cancelado` no consumen cupo.
+Los pedidos `pendiente` y `confirmado` consumen cupo. Los pedidos `cancelado` y
+`entregado` no consumen cupo.
 
 El alta y la edicion de pedidos se ejecutan dentro de transacciones serializadas
 para evitar superar el cupo ante solicitudes concurrentes.
@@ -423,6 +436,8 @@ confirmado -> entregado   (admin)
 - Un admin puede gestionar todos los pedidos, menus, sedes y usuarios.
 - Las operaciones administrativas requieren JWT con rol `admin`.
 - El registro publico siempre crea usuarios con rol `usuario`.
+- Al cambiar el menu de un pedido se vuelve a validar existencia, actividad,
+  fecha y cupo, y se recalcula el total.
 
 ## Tests
 
@@ -481,6 +496,31 @@ No usar `SEED_ON_START=true` en produccion real: crea credenciales demo conocida
 
 SQLite es adecuado para una sola instancia. Para escalar horizontalmente, migrar
 la persistencia a PostgreSQL u otro servidor de base de datos.
+
+## Decisiones tecnicas
+
+- SQLite permite persistencia real y una instalacion reproducible sin servicios
+  externos. Las migraciones se ejecutan automaticamente al abrir la base.
+- La API separa rutas, controladores, servicios, validadores y middlewares. Las
+  reglas de cupo, permisos por propietario y transiciones viven en servicios.
+- Los pedidos se procesan dentro de transacciones serializadas para evitar que
+  dos solicitudes concurrentes superen el cupo disponible.
+- Menus, sedes y usuarios se activan o desactivan en lugar de eliminarse para
+  preservar relaciones, auditoria y datos historicos.
+- Los cambios administrativos de rol o estado de usuario toman efecto inmediato
+  porque cada request protegido consulta nuevamente la base de datos.
+- Los entregados dejan de consumir cupo, pero permanecen como registro historico.
+
+## Limitaciones conocidas
+
+- SQLite soporta una sola instancia de backend para las escrituras coordinadas
+  por este proceso. Para multiples instancias se requiere una base compartida.
+- La API sirve imagenes existentes desde disco, pero no implementa carga de
+  archivos ni almacenamiento de objetos.
+- No existen refresh tokens; al expirar el JWT se debe iniciar sesion nuevamente.
+- No se implementa eliminacion fisica de menus, sedes o usuarios.
+- Este repositorio contiene solamente el backend. El frontend se mantiene en un
+  repositorio separado.
 
 ## Estructura del proyecto
 
