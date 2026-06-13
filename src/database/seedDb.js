@@ -4,20 +4,14 @@ import { fileURLToPath } from "url";
 import { getDb } from "./db.js";
 import { seedMenus } from "./seedMenus.js";
 import { seedSedes } from "./seedSedes.js";
+import { syncSedes } from "./syncSedes.js";
 
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS) || 10;
 
 export async function seedDb() {
     const db = await getDb();
 
-    for (const [nombre, direccion, activo] of seedSedes) {
-        await db.run(
-            `INSERT INTO sedes (nombre, direccion, activo)
-             VALUES (?, ?, ?)
-             ON CONFLICT(nombre) DO UPDATE SET direccion = excluded.direccion, activo = excluded.activo`,
-            [nombre, direccion, activo]
-        );
-    }
+    await syncSedes();
     const sedeIds = new Map(
         (await db.all("SELECT id, nombre FROM sedes")).map(sede => [sede.nombre, sede.id])
     );

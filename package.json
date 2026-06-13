@@ -10,6 +10,7 @@
     "init-db": "node src/database/initDb.js",
     "seed": "node src/database/seedDb.js",
     "sync-menus": "node src/database/syncMenus.js",
+    "sync-sedes": "node src/database/syncSedes.js",
     "sync-menu-images": "node src/database/syncMenuImages.js"
   },
   "engines": { "node": ">=18" },

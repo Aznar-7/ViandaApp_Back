@@ -31,6 +31,7 @@ export const JWT_AUDIENCE = process.env.JWT_AUDIENCE || "viandas-frontend";
 export const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS ?? (NODE_ENV === "production" ? 1 : 0));
 export const SEED_ON_START = process.env.SEED_ON_START === "true";
 export const SYNC_MENUS_ON_START = process.env.SYNC_MENUS_ON_START !== "false";
+export const SYNC_SEDES_ON_START = process.env.SYNC_SEDES_ON_START !== "false";
 
 if (!Number.isInteger(TRUST_PROXY_HOPS) || TRUST_PROXY_HOPS < 0) {
     throw new Error("TRUST_PROXY_HOPS debe ser un numero entero mayor o igual a 0");

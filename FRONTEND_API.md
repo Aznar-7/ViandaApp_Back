@@ -291,6 +291,14 @@ Por defecto devuelve solo sedes activas. Acepta `?activo=0|1`.
 
 El `id` seleccionado se envia como `puntoRetiroId` al crear o editar un pedido.
 
+Las sedes definidas en `src/database/seedSedes.js` se sincronizan con:
+
+```bash
+npm run sync-sedes
+```
+
+En Render, `SYNC_SEDES_ON_START=true` las sincroniza automaticamente al arrancar.
+
 ## Pedidos
 
 Todas las rutas de esta seccion requieren JWT.

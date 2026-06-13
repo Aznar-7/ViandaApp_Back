@@ -55,7 +55,68 @@ export async function runMigrations(db) {
         `);
     }
 
+    if (hasPuntoRetiro) {
+        const { total } = await db.get(
+            "SELECT COUNT(*) AS total FROM pedidos WHERE puntoRetiroId IS NULL"
+        );
+        if (total > 0) {
+            throw new Error(`No se pudieron asociar ${total} pedidos legacy a una sede`);
+        }
+
+        await db.run("PRAGMA foreign_keys = OFF");
+        await db.run("BEGIN");
+        try {
+            await db.exec(`
+                CREATE TABLE pedidos_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    menuId INTEGER NOT NULL,
+                    usuarioId INTEGER NOT NULL,
+                    fecha TEXT NOT NULL,
+                    cantidad INTEGER NOT NULL,
+                    turnoEntrega TEXT NOT NULL CHECK (turnoEntrega IN ('almuerzo', 'cena')),
+                    puntoRetiroId INTEGER NOT NULL,
+                    total REAL NOT NULL,
+                    estado TEXT NOT NULL CHECK (estado IN ('pendiente', 'confirmado', 'cancelado', 'entregado')),
+                    observaciones TEXT,
+                    FOREIGN KEY (menuId) REFERENCES menus(id),
+                    FOREIGN KEY (usuarioId) REFERENCES usuarios(id),
+                    FOREIGN KEY (puntoRetiroId) REFERENCES sedes(id)
+                );
+
+                INSERT INTO pedidos_new (
+                    id, menuId, usuarioId, fecha, cantidad, turnoEntrega,
+                    puntoRetiroId, total, estado, observaciones
+                )
+                SELECT
+                    id, menuId, usuarioId, fecha, cantidad, turnoEntrega,
+                    puntoRetiroId, total, estado, observaciones
+                FROM pedidos;
+
+                DROP TABLE pedidos;
+                ALTER TABLE pedidos_new RENAME TO pedidos;
+            `);
+            await db.run("COMMIT");
+        } catch (error) {
+            await db.run("ROLLBACK").catch(() => {});
+            throw error;
+        } finally {
+            await db.run("PRAGMA foreign_keys = ON");
+        }
+    }
+
     await db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_pedidos_usuarioId
+        ON pedidos(usuarioId);
+
+        CREATE INDEX IF NOT EXISTS idx_pedidos_estado
+        ON pedidos(estado);
+
+        CREATE INDEX IF NOT EXISTS idx_pedidos_fecha
+        ON pedidos(fecha);
+
+        CREATE INDEX IF NOT EXISTS idx_pedidos_menuId
+        ON pedidos(menuId);
+
         CREATE INDEX IF NOT EXISTS idx_pedidos_menu_fecha_estado
         ON pedidos(menuId, fecha, estado);
 

@@ -21,6 +21,7 @@ npm install
 npm run init-db   # crea las tablas
 npm run seed      # carga datos de prueba
 npm run sync-menus # actualiza/inserta el catalogo seed sin borrar datos
+npm run sync-sedes # actualiza/inserta las sedes sin borrar datos
 npm run sync-menu-images # actualiza imagenUrl sin borrar datos existentes
 npm run dev       # 🚀 http://localhost:3000
 ```
@@ -79,6 +80,7 @@ TRUST_PROXY_HOPS=1
 DB_FILE=/var/data/database.sqlite
 SEED_ON_START=false
 SYNC_MENUS_ON_START=true
+SYNC_SEDES_ON_START=true
 ```
 
 - `TRUST_PROXY_HOPS=1` permite que `express-rate-limit` identifique correctamente
@@ -88,6 +90,8 @@ SYNC_MENUS_ON_START=true
   porque crea credenciales conocidas.
 - `SYNC_MENUS_ON_START=true` actualiza el catalogo seed e inserta menús faltantes
   automaticamente en cada deploy. Es idempotente y no requiere Render Shell.
+- `SYNC_SEDES_ON_START=true` actualiza e inserta sedes automaticamente en cada
+  deploy. Es idempotente y no crea usuarios ni pedidos demo.
 - SQLite necesita un Persistent Disk montado en `/var/data`. Sin disco
   persistente, Render puede perder toda la base al reiniciar o desplegar.
 - Para escalar a mas de una instancia, migrar SQLite a PostgreSQL.
@@ -97,6 +101,7 @@ manualmente cuando exista acceso a una terminal:
 
 ```bash
 npm run sync-menus
+npm run sync-sedes
 ```
 
 Este comando actualiza los menús seed con IDs `1` a `12` e inserta los faltantes,
